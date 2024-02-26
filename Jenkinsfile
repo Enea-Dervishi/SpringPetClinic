@@ -6,6 +6,11 @@ pipeline {
         }
     }
     stages {
+        stage('Git') {
+            steps {
+                checkout 
+            }
+        }
         stage('Build') {
             steps {
                 sh 'mvn clean verify'
