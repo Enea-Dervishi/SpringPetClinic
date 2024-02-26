@@ -1,1 +1,1 @@
-continuous_integration() 
+build()
