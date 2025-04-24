@@ -1,2 +1,155 @@
-continuous_integration()
-logVersionInfo()
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'USER_NAME', description: 'Your full name')
+        string(name: 'USER_EMAIL', description: 'Your email address')
+        string(name: 'PET_NAME', description: 'Your pet\'s name')
+        choice(name: 'PET_TYPE', choices: ['Cat', 'Dog', 'Bird', 'Other'], description: 'Type of pet')
+        string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev/staging/prod)')
+        string(name: 'DOCKERHUB_USERNAME', description: 'DockerHub username')
+        string(name: 'DOCKERHUB_PASSWORD', description: 'DockerHub password', password: true)
+    }
+    
+    environment {
+        DOCKER_IMAGE = "${params.DOCKERHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
+    }
+    
+    stages {
+        stage('User Input Validation') {
+            steps {
+                script {
+                    echo "Validating user input for ${params.USER_NAME}'s pet ${params.PET_NAME}"
+
+                    if (!params.USER_NAME?.trim()) {
+                        error "User name cannot be empty"
+                    }
+                    if (params.USER_NAME.split().size() < 2) {
+                        error "Please provide both first and last name"
+                    }
+                    
+                    // Email validation
+                    if (!params.USER_EMAIL?.trim()) {
+                        error "Email cannot be empty"
+                    }
+                    if (!params.USER_EMAIL.matches('^[A-Za-z0-9+_.-]+@(.+)$')) {
+                        error "Invalid email format"
+                    }
+                    
+                    // Pet name validation
+                    if (!params.PET_NAME?.trim()) {
+                        error "Pet name cannot be empty"
+                    }
+                    if (params.PET_NAME.length() < 2) {
+                        error "Pet name must be at least 2 characters long"
+                    }
+                    
+                    // Environment validation
+                    if (!['dev', 'staging', 'prod'].contains(params.ENVIRONMENT)) {
+                        error "Environment must be one of: dev, staging, prod"
+                    }
+                    
+                    // DockerHub credentials validation
+                    if (!params.DOCKERHUB_USERNAME?.trim()) {
+                        error "DockerHub username cannot be empty"
+                    }
+                    if (!params.DOCKERHUB_PASSWORD?.trim()) {
+                        error "DockerHub password cannot be empty"
+                    }
+                    
+                    // Additional validations based on environment
+                    if (params.ENVIRONMENT == 'prod') {
+                        if (!params.USER_EMAIL.endsWith('@company.com')) {
+                            error "Production environment requires company email"
+                        }
+                        if (params.PET_TYPE == 'Other') {
+                            error "Production environment does not support 'Other' pet type"
+                        }
+                    }
+                    
+                    echo "All validations passed successfully"
+
+                }
+            }
+        }
+        
+        stage('Terraform Infrastructure') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform init'
+                    sh 'terraform plan -var="environment=${params.ENVIRONMENT}"'
+                    sh 'terraform apply -auto-approve -var="environment=${params.ENVIRONMENT}"'
+                }
+            }
+        }
+        
+        stage('Build & Test') {
+            steps {
+                sh './mvnw clean package'
+                sh './mvnw test'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh "docker build -t ${DOCKER_IMAGE} ."
+                }
+            }
+        }
+        
+        stage('Push to DockerHub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                        sh "echo ${DOCKERHUB_PASSWORD} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin"
+                        sh "docker push ${DOCKER_IMAGE}"
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy & Register') {
+            steps {
+                script {
+                    // Deploy the application using Docker
+                    sh "docker run -d -p 8080:8080 --name petclinic-${params.ENVIRONMENT} ${DOCKER_IMAGE}"
+                    
+                    // Wait for application to start
+                    sleep(time: 30, unit: 'SECONDS')
+                    
+                    // Register the new user and pet using the application's API
+                    sh """
+                        curl -X POST "http://localhost:8080/api/owners" \
+                        -H "Content-Type: application/json" \
+                        -d '{
+                            "firstName": "${params.USER_NAME.split()[0]}",
+                            "lastName": "${params.USER_NAME.split()[1] ?: ''}",
+                            "email": "${params.USER_EMAIL}",
+                            "pets": [{
+                                "name": "${params.PET_NAME}",
+                                "type": "${params.PET_TYPE}"
+                            }]
+                        }'
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Cleanup
+            sh "docker stop petclinic-${params.ENVIRONMENT} || true"
+            sh "docker rm petclinic-${params.ENVIRONMENT} || true"
+            echo "Pipeline completed for ${params.USER_NAME}'s pet ${params.PET_NAME}"
+        }
+        success {
+            echo "Successfully registered ${params.PET_NAME} for ${params.USER_NAME}"
+            echo "Docker image pushed: ${DOCKER_IMAGE}"
+        }
+        failure {
+            echo "Failed to complete the registration process"
+        }
+    }
+}
