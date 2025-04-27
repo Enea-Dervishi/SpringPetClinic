@@ -68,8 +68,8 @@ pipeline {
             steps {
                 dir('terraform') {
                     sh 'terraform init'
-                    sh 'terraform plan -var="environment=${params.ENVIRONMENT}"'
-                    sh 'terraform apply -auto-approve -var="environment=${params.ENVIRONMENT}"'
+                    sh "terraform plan -var='tf_env=${params.ENVIRONMENT}'"
+                    sh "terraform apply -auto-approve -var='tf_env=${params.ENVIRONMENT}'"
                 }
             }
         }
