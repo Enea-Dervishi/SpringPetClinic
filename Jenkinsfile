@@ -59,17 +59,6 @@ pipeline {
                     }
                     
                     echo "All validations passed successfully"
-
-                }
-            }
-        }
-        
-        stage('Terraform Infrastructure') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform init'
-                    sh "terraform plan -var='tf_env=${params.ENVIRONMENT}'"
-                    sh "terraform apply -auto-approve -var='tf_env=${params.ENVIRONMENT}'"
                 }
             }
         }
@@ -123,6 +112,16 @@ pipeline {
                             }]
                         }'
                     """
+                }
+            }
+        }
+
+        stage('Terraform Infrastructure') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform init'
+                    sh "terraform plan -var='tf_env=${params.ENVIRONMENT}'"
+                    sh "terraform apply -auto-approve -var='tf_env=${params.ENVIRONMENT}'"
                 }
             }
         }
