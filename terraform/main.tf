@@ -22,7 +22,7 @@ variable "environment" {
 }
 
 locals {
-  name_prefix = "petclinic-${var.environment}"
+  name_prefix = "petclinic-${var.tf_env}"
 }
 
 # VPC Configuration

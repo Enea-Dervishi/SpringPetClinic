@@ -1,4 +1,4 @@
-variable "environment" {
+variable "tf_env" {
   description = "Environment name (dev/staging/prod)"
   type        = string
 }
