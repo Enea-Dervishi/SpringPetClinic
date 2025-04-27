@@ -10,7 +10,7 @@ pipeline {
     }
     
     environment {
-        GITHUB_USERNAME = 'Enea-Dervishi'
+        GITHUB_USERNAME = 'enea-dervishi'
         DOCKER_IMAGE = "ghcr.io/${GITHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
     }
     
