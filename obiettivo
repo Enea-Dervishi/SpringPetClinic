@@ -1,0 +1,146 @@
+# Fase 1: Consolidamento Pipeline e CI/CD (Settimane 1-2)
+
+## Obiettivi
+- Approfondire Jenkins, GitLab CI/CD e Bitbucket Pipelines
+- Introdurre concetti di pipeline moderne (multi-stage, reusable, modular)
+
+## Attività
+- Creare una pipeline completa per ambienti di Dev, Staging(QA) e Produzione
+- Scrivere job parametrizzati e con branching logic (con un core condiviso?)
+- Integrare test automatici (unit test, integration test)
+
+## Check di fine fase
+- Mostrare la pipeline completa e deployabile
+- La pipeline dovrà essere: multi-stage e riusabile utilizzando parametri (ed un core condiviso?)
+
+## Materiale per studio CI/CD & GitOps
+- “The DevOps Handbook” (ottimo per una base solida)
+- YouTube (es: “ArgoCD in 15 mins”, “Terraform explained”)
+
+## NOTE
+- Repo GitHub: -----
+- Repo DockerHub: -----
+- Jenkins: In Locale
+- Install k3s on WSL
+  https://www.digitalocean.com/community/tutorials/how-to-setup-k3s-kubernetes-cluster-on-ubuntu
+- vmware, virtualbox possible option alternative
+
+---
+
+# Fase 2: Introduzione a Terraform (Settimane 3-5)
+
+## Obiettivi
+- Comprendere l'IaC (Infrastructure as Code)
+- Saper scrivere configurazioni base per provisioning su cloud (es. AWS, GCP, o anche local con Docker)
+
+## Attività
+- Installare e configurare Terraform
+- Creare un progetto semplice: ad esempio provisioning di un cluster Kubernetes su un tool (come Docker desktop Kubernetes oppure k3s installato mono-nodo su una VM)
+- Aggiungere variabili, moduli e gestione dello stato
+
+## Check di fine fase
+- Mostrare un'infrastruttura deployata e distrutta con Terraform
+- Spiegare la differenza tra plan, apply, destroy
+- Scrivere un modulo Terraform riutilizzabile
+
+## Materiale per studio ed approfondimenti su Terraform
+- HashiCorp Learn: https://learn.hashicorp.com/terraform
+- Esercizi pratici su Katacoda (se disponibile)
+
+## NOTE
+
+---
+
+# Fase 3: Introduzione ad ArgoCD e GitOps (Settimane 6-8)
+
+## Obiettivi
+- Capire il paradigma GitOps
+- Imparare a deployare applicazioni su Kubernetes con ArgoCD
+
+## Attività
+- Installare ArgoCD (es. su k3s)
+- Collegare un repository Git con manifest K3s
+- Configurare un'applicazione demo da deployare e aggiornare tramite Git
+- Scrivere o trovare una app semplice in modo che sia facile fare dei test (*vedi fondo pagina*)
+
+## Check di fine fase
+- Mostrare il flusso completo Git → ArgoCD → Kubernetes
+- Fare un rollout controllato (es. blue/green o canary se possibile)
+- (Risolvere un errore di sync e spiegarne la causa?)
+
+## Materiale per studio ed approfondimenti su ArgoCD
+- Docs ufficiali: https://argo-cd.readthedocs.io
+- Workshop: https://github.com/argoproj/argocd-example-apps
+
+## NOTE
+
+---
+
+# Fase 4: Integrazione avanzata e automazione (Settimane 9-11)
+
+## Obiettivi
+- Unire CI/CD + Terraform + ArgoCD in un flusso completo
+- Sviluppare autonomia nell'automazione e troubleshooting
+
+## Attività
+- Costruire una pipeline che:
+  - Esegue gli unit test (almeno 2 o 3 test) (*vedi note a fondo pagina*)
+  - Provisiona con Terraform (es. un cluster o namespace)
+  - Fa il deploy GitOps tramite ArgoCD
+  - Aggiunge notifiche (Slack, email)
+
+## Check finale
+- Mostrare il progetto end-to-end
+- Spiegare l'architettura e i tool usati
+- Ricevere un "incident" finto e gestirlo (es: rollback, fix, retry pipeline)
+
+## NOTE
+
+---
+
+# Fase 5: DevOps Full Pipeline Project (Settimane 12-13)
+
+## Obiettivo finale
+- Realizzare una pipeline GitOps completa che:
+  - Esegue almeno i test automatici (*vedi note a fondo pagina*)
+  - Costruisce l'app containerizzata (build app + build container + push)
+  - Provvisiona l'infrastruttura con Terraform per QA
+  - Deploya su Kubernetes tramite ArgoCD
+  - Implementa un sistema di rollback automatico
+  - Ritorna al punto 3 e deploya su PROD
+
+## Output atteso
+- Repo contenente:
+  - App sviluppata da containerizzare
+  - Dockerfile funzionante più file docker-compose
+  - Files di approvvigionamento per Terraform
+  - File codice YAML + kustomization per deploy manifest
+  - Lato ArgoCD implementare la soluzione in modo che abbia un Hook che si accorga delle modifiche e proponga all'utente (tramite UI) di applicarle sul cluster.
+
+## Test finale
+- Dimostrare la corretta esecuzione di un rollback dell'app
+- Dimostrare la corretta distruzione con Terraform
+
+## Note sugli Unit Test della fase 5
+- Lo scopo degli unit test è quello di testare singole funzioni dell'app.
+- I test vengono eseguiti prima di rilasciare il codice sul repository in modo che, ad ogni nuovo rilascio, vengano testati i metodi principali + un corposo set di metodi meno importanti, per verificare che le modifiche rilasciate non rompano l'applicazione in qualche punto.
+- Esempio:
+  - Testare che la funzione somma(a, b, c) restituisca il risultato atteso.
+  - Il test per la funzione somma() userà un mock di dati noti e di cui si conosce l'esito esatto.
+  - $dati = [2, 3, 7]
+  - $result_atteso = 12
+  - chiamando somma e passandogli $dati controlliamo che l'esito sia uguale a $result_atteso
+- Solitamente per avere degli unit test validi si crea almeno un test per funzione, l'ideale sarebbe avere almeno 2 o 3 test per funzione:
+  - uno che controlla l'esito corretto
+  - uno che controlla il tipo di dato ritornato
+  - ed uno che controlli anche l'esito 'non corretto' nel caso venga passato in input un tipo di dato errato
+- In ambiente bancario e nelle assicurazioni si usa coprire almeno l'85 / 90% del codice sviluppato, con almeno un test unitario. Esistono inoltre altri tipi di test come per esempio i test di regressione (regression test), gli integration test etc etc. Lascio a te approfondire il discorso se ti interessa
+
+---
+
+# Next Step: Jenkins Templating Engine
+- Costruire una SOLIDA libreria JTE Jenkins Template Enterprise per i nostri casi d'uso
+
+## Materiale consultabile
+- https://plugins.jenkins.io/templating-engine/
+- https://jenkinsci.github.io/templating-engine-plugin/2.5.3/

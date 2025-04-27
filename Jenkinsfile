@@ -7,8 +7,8 @@ pipeline {
         string(name: 'PET_NAME', description: 'Your pet\'s name')
         choice(name: 'PET_TYPE', choices: ['Cat', 'Dog', 'Bird', 'Other'], description: 'Type of pet')
         string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev/staging/prod)')
-        string(name: 'DOCKERHUB_USERNAME', description: 'DockerHub username')
-        string(name: 'DOCKERHUB_PASSWORD', description: 'DockerHub password', password: true)
+        //string(name: 'DOCKERHUB_USERNAME', description: 'DockerHub username')
+        //string(name: 'DOCKERHUB_PASSWORD', description: 'DockerHub password', password: true)
     }
     
     environment {
