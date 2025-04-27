@@ -11,16 +11,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-variable "aws_region" {
-  description = "AWS region"
-  default     = "us-east-1"
-}
-
-variable "environment" {
-  description = "Environment name (dev/staging/prod)"
-  type        = string
-}
-
 locals {
   name_prefix = "petclinic-${var.tf_env}"
 }
