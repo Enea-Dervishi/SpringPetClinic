@@ -7,12 +7,12 @@ pipeline {
         string(name: 'PET_NAME', description: 'Your pet\'s name')
         choice(name: 'PET_TYPE', choices: ['Cat', 'Dog', 'Bird', 'Other'], description: 'Type of pet')
         string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev/staging/prod)')
-        //string(name: 'DOCKERHUB_USERNAME', description: 'DockerHub username')
-        //string(name: 'DOCKERHUB_PASSWORD', description: 'DockerHub password', password: true)
+        string(name: 'GITHUB_USERNAME', description: 'Your GitHub username')
+        string(name: 'GITHUB_TOKEN', description: 'GitHub Personal Access Token', password: true)
     }
     
     environment {
-        DOCKER_IMAGE = "${params.DOCKERHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
+        DOCKER_IMAGE = "ghcr.io/${params.GITHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
     }
     
     stages {
@@ -49,12 +49,12 @@ pipeline {
                         error "Environment must be one of: dev, staging, prod"
                     }
                     
-                    // DockerHub credentials validation
-                    if (!params.DOCKERHUB_USERNAME?.trim()) {
-                        error "DockerHub username cannot be empty"
+                    // GitHub credentials validation
+                    if (!params.GITHUB_USERNAME?.trim()) {
+                        error "GitHub username cannot be empty"
                     }
-                    if (!params.DOCKERHUB_PASSWORD?.trim()) {
-                        error "DockerHub password cannot be empty"
+                    if (!params.GITHUB_TOKEN?.trim()) {
+                        error "GitHub Personal Access Token cannot be empty"
                     }
                     
                     // Additional validations based on environment
@@ -98,11 +98,11 @@ pipeline {
             }
         }
         
-        stage('Push to DockerHub') {
+        stage('Push to GitHub Container Registry') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
-                        sh "echo ${DOCKERHUB_PASSWORD} | docker login -u ${DOCKERHUB_USERNAME} --password-stdin"
+                    withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+                        sh "echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin"
                         sh "docker push ${DOCKER_IMAGE}"
                     }
                 }
