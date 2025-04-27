@@ -7,12 +7,11 @@ pipeline {
         string(name: 'PET_NAME', description: 'Your pet\'s name')
         choice(name: 'PET_TYPE', choices: ['Cat', 'Dog', 'Bird', 'Other'], description: 'Type of pet')
         string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev/staging/prod)')
-        string(name: 'GITHUB_USERNAME', description: 'Your GitHub username')
-        string(name: 'GITHUB_TOKEN', description: 'GitHub Personal Access Token', password: true)
     }
     
     environment {
-        DOCKER_IMAGE = "ghcr.io/${params.GITHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
+        GITHUB_USERNAME = 'Enea-Dervishi'
+        DOCKER_IMAGE = "ghcr.io/${GITHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
     }
     
     stages {
@@ -47,14 +46,6 @@ pipeline {
                     // Environment validation
                     if (!['dev', 'staging', 'prod'].contains(params.ENVIRONMENT)) {
                         error "Environment must be one of: dev, staging, prod"
-                    }
-                    
-                    // GitHub credentials validation
-                    if (!params.GITHUB_USERNAME?.trim()) {
-                        error "GitHub username cannot be empty"
-                    }
-                    if (!params.GITHUB_TOKEN?.trim()) {
-                        error "GitHub Personal Access Token cannot be empty"
                     }
                     
                     // Additional validations based on environment
@@ -101,7 +92,7 @@ pipeline {
         stage('Push to GitHub Container Registry') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+                    withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
                         sh "echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin"
                         sh "docker push ${DOCKER_IMAGE}"
                     }
