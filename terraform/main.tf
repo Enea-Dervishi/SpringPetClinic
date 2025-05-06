@@ -47,7 +47,12 @@ resource "kubernetes_deployment" "petclinic" {
           name  = "petclinic"
 
           port {
-            container_port = 8080
+            container_port = 8081
+          }
+
+          env {
+            name  = "SERVER_PORT"
+            value = "8081"
           }
         }
       }
@@ -69,7 +74,7 @@ resource "kubernetes_service" "petclinic" {
 
     port {
       port        = 80
-      target_port = 8080
+      target_port = 8081
     }
 
     type = "NodePort"
