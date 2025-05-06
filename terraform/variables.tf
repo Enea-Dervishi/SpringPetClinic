@@ -3,10 +3,22 @@ variable "tf_env" {
   type        = string
 }
 
-variable "aws_region" {
-  description = "AWS region"
+variable "namespace" {
+  description = "Kubernetes namespace for the PetClinic application"
   type        = string
-  default     = "us-east-1"
+  default     = "petclinic"
+}
+
+variable "replicas" {
+  description = "Number of replicas for the PetClinic deployment"
+  type        = number
+  default     = 1
+}
+
+variable "container_image" {
+  description = "Container image for the PetClinic application"
+  type        = string
+  default     = "springcommunity/spring-petclinic:latest"
 }
 
 variable "instance_type" {

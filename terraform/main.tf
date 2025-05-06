@@ -1,118 +1,77 @@
 terraform {
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 4.0"
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
     }
   }
 }
 
-provider "aws" {
-  region = var.aws_region
+provider "kubernetes" {
+  config_path = "~/.kube/config"
 }
 
-locals {
-  name_prefix = "petclinic-${var.tf_env}"
-}
-
-# VPC Configuration
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = {
-    Name = "${local.name_prefix}-vpc"
+# Create a namespace for the pet clinic
+resource "kubernetes_namespace" "petclinic" {
+  metadata {
+    name = "petclinic"
   }
 }
 
-# Subnet Configuration
-resource "aws_subnet" "public" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.1.0/24"
-  availability_zone = "${var.aws_region}a"
+# Create a deployment for the Spring PetClinic application
+resource "kubernetes_deployment" "petclinic" {
+  metadata {
+    name      = "petclinic"
+    namespace = kubernetes_namespace.petclinic.metadata[0].name
+  }
 
-  tags = {
-    Name = "${local.name_prefix}-public-subnet"
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "petclinic"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app = "petclinic"
+        }
+      }
+
+      spec {
+        container {
+          image = "springcommunity/spring-petclinic:latest"
+          name  = "petclinic"
+
+          port {
+            container_port = 8080
+          }
+        }
+      }
+    }
   }
 }
 
-# Security Group for Application
-resource "aws_security_group" "app" {
-  name        = "${local.name_prefix}-app-sg"
-  description = "Security group for PetClinic application"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+# Create a service to expose the application
+resource "kubernetes_service" "petclinic" {
+  metadata {
+    name      = "petclinic"
+    namespace = kubernetes_namespace.petclinic.metadata[0].name
   }
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  spec {
+    selector = {
+      app = "petclinic"
+    }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+    port {
+      port        = 80
+      target_port = 8080
+    }
 
-  tags = {
-    Name = "${local.name_prefix}-app-sg"
-  }
-}
-
-# EC2 Instance for Application
-resource "aws_instance" "app" {
-  ami           = "ami-0c55b159cbfafe1f0" # Amazon Linux 2
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public.id
-
-  vpc_security_group_ids = [aws_security_group.app.id]
-
-  tags = {
-    Name = "${local.name_prefix}-app-server"
-  }
-
-  user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              yum install -y java-1.8.0-openjdk
-              EOF
-}
-
-# RDS Instance for Database
-resource "aws_db_instance" "petclinic" {
-  identifier           = "${local.name_prefix}-db"
-  engine              = "mysql"
-  engine_version      = "5.7"
-  instance_class      = "db.t2.micro"
-  allocated_storage   = 20
-  storage_type        = "gp2"
-  username            = "petclinic"
-  password            = "petclinic"
-  skip_final_snapshot = true
-
-  vpc_security_group_ids = [aws_security_group.app.id]
-  db_subnet_group_name   = aws_db_subnet_group.petclinic.name
-
-  tags = {
-    Name = "${local.name_prefix}-db"
-  }
-}
-
-resource "aws_db_subnet_group" "petclinic" {
-  name       = "${local.name_prefix}-db-subnet-group"
-  subnet_ids = [aws_subnet.public.id]
-
-  tags = {
-    Name = "${local.name_prefix}-db-subnet-group"
+    type = "NodePort"
   }
 } 
