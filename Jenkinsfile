@@ -93,14 +93,14 @@ pipeline {
             steps {
                 script {
                     // Deploy the application using Docker
-                    sh "docker run -d -p 8080:8080 --name petclinic-${params.ENVIRONMENT} ${DOCKER_IMAGE}"
+                    sh "docker run -d -p 8081:8081 --name petclinic-${params.ENVIRONMENT} ${DOCKER_IMAGE}"
 
                     // Wait for application to start
                     sleep(time: 30, unit: 'SECONDS')
 
                     // Register the new user and pet using the application's API
                     sh """
-                        curl -X POST "http://localhost:8080/api/owners" \
+                        curl -X POST "http://localhost:8081/api/owners" \
                         -H "Content-Type: application/json" \
                         -d '{
                             "firstName": "${params.USER_NAME.split()[0]}",
