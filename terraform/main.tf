@@ -42,8 +42,12 @@ resource "kubernetes_deployment" "petclinic" {
       }
 
       spec {
+        image_pull_secrets{
+          name = "ghcr-secret"
+        }
+        
         container {
-          image = "springcommunity/spring-petclinic:latest"
+          image = "ghcr.io/enea-dervishi/spring-petclinic:latest"
           name  = "petclinic"
 
           port {

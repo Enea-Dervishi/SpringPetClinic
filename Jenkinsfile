@@ -1,6 +1,6 @@
 pipeline {
     agent any
-    
+
     parameters {
         string(name: 'USER_NAME', description: 'Your full name')
         string(name: 'USER_EMAIL', description: 'Your email address')
@@ -8,12 +8,12 @@ pipeline {
         choice(name: 'PET_TYPE', choices: ['Cat', 'Dog', 'Bird', 'Other'], description: 'Type of pet')
         string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev/staging/prod)')
     }
-    
+
     environment {
         GITHUB_USERNAME = 'enea-dervishi'
         DOCKER_IMAGE = "ghcr.io/${GITHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
     }
-    
+
     stages {
         stage('User Input Validation') {
             steps {
@@ -21,55 +21,55 @@ pipeline {
                     echo "Validating user input for ${params.USER_NAME}'s pet ${params.PET_NAME}"
 
                     if (!params.USER_NAME?.trim()) {
-                        error "User name cannot be empty"
+                        error 'User name cannot be empty'
                     }
                     if (params.USER_NAME.split().size() < 2) {
-                        error "Please provide both first and last name"
+                        error 'Please provide both first and last name'
                     }
-                    
+
                     // Email validation
                     if (!params.USER_EMAIL?.trim()) {
-                        error "Email cannot be empty"
+                        error 'Email cannot be empty'
                     }
                     if (!params.USER_EMAIL.matches('^[A-Za-z0-9+_.-]+@(.+)$')) {
-                        error "Invalid email format"
+                        error 'Invalid email format'
                     }
-                    
+
                     // Pet name validation
                     if (!params.PET_NAME?.trim()) {
-                        error "Pet name cannot be empty"
+                        error 'Pet name cannot be empty'
                     }
                     if (params.PET_NAME.length() < 2) {
-                        error "Pet name must be at least 2 characters long"
+                        error 'Pet name must be at least 2 characters long'
                     }
-                    
+
                     // Environment validation
                     if (!['dev', 'staging', 'prod'].contains(params.ENVIRONMENT)) {
-                        error "Environment must be one of: dev, staging, prod"
+                        error 'Environment must be one of: dev, staging, prod'
                     }
-                    
+
                     // Additional validations based on environment
                     if (params.ENVIRONMENT == 'prod') {
                         if (!params.USER_EMAIL.endsWith('@company.com')) {
-                            error "Production environment requires company email"
+                            error 'Production environment requires company email'
                         }
                         if (params.PET_TYPE == 'Other') {
                             error "Production environment does not support 'Other' pet type"
                         }
                     }
-                    
-                    echo "All validations passed successfully"
+
+                    echo 'All validations passed successfully'
                 }
             }
         }
-        
+
         stage('Build & Test') {
             steps {
                 sh 'chmod +x ./mvnw'
                 sh './mvnw clean package'
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -77,7 +77,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Push to GitHub Container Registry') {
             steps {
                 script {
@@ -88,16 +88,16 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Deploy & Register') {
             steps {
                 script {
                     // Deploy the application using Docker
                     sh "docker run -d -p 8080:8080 --name petclinic-${params.ENVIRONMENT} ${DOCKER_IMAGE}"
-                    
+
                     // Wait for application to start
                     sleep(time: 30, unit: 'SECONDS')
-                    
+
                     // Register the new user and pet using the application's API
                     sh """
                         curl -X POST "http://localhost:8080/api/owners" \
@@ -126,7 +126,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         always {
             // Cleanup
@@ -139,7 +139,7 @@ pipeline {
             echo "Docker image pushed: ${DOCKER_IMAGE}"
         }
         failure {
-            echo "Failed to complete the registration process"
+            echo 'Failed to complete the registration process'
         }
     }
 }
