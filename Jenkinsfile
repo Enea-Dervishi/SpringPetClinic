@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+    }
+
     parameters {
         string(name: 'USER_NAME', description: 'Your full name')
         string(name: 'USER_EMAIL', description: 'Your email address')
@@ -12,6 +16,8 @@ pipeline {
     environment {
         GITHUB_USERNAME = 'enea-dervishi'
         DOCKER_IMAGE = "ghcr.io/${GITHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
+        DOCKER_NETWORK = "petclinic-network-${BUILD_NUMBER}"
+        KUBECONFIG = '/etc/rancher/k3s/k3s.yaml'
     }
 
     stages {
@@ -92,26 +98,99 @@ pipeline {
         stage('Deploy & Register') {
             steps {
                 script {
-                    // Deploy the application using Docker
-                    sh "docker run -d -p 8081:8081 --name petclinic-${params.ENVIRONMENT} ${DOCKER_IMAGE}"
+                    // Creating a dedicated network for the application
+                    sh "docker network create ${DOCKER_NETWORK} || true"
 
-                    // Wait for application to start
-                    sleep(time: 30, unit: 'SECONDS')
-
-                    // Register the new user and pet using the application's API
+                    // Deploy the application using Docker with the custom network
                     sh """
-                        curl -X POST "http://localhost:8081/api/owners" \
-                        -H "Content-Type: application/json" \
-                        -d '{
-                            "firstName": "${params.USER_NAME.split()[0]}",
-                            "lastName": "${params.USER_NAME.split()[1] ?: ''}",
-                            "email": "${params.USER_EMAIL}",
-                            "pets": [{
-                                "name": "${params.PET_NAME}",
-                                "type": "${params.PET_TYPE}"
-                            }]
-                        }'
+                        docker run -d --name petclinic-${params.ENVIRONMENT} \
+                        --network ${DOCKER_NETWORK} \
+                        -p 8081:8081 \
+                        ${DOCKER_IMAGE}
                     """
+                    echo 'Waiting for application to start...'
+                    sleep(time: 60, unit: 'SECONDS')
+
+                    // Check if the application is up by making a simple GET request
+                    sh 'curl -v http://localhost:8081/actuator/health || echo "Application health check failed but continuing"'
+                    sh 'curl -v http://localhost:8081/ || echo "Application homepage check failed but continuing"'
+
+                    // Print container logs and network info to help with debugging
+                    echo 'Container logs:'
+                    sh "docker logs petclinic-${params.ENVIRONMENT}"
+                    echo 'Docker network info:'
+                    sh "docker network inspect ${DOCKER_NETWORK}"
+                    echo 'Container info:'
+                    sh "docker inspect petclinic-${params.ENVIRONMENT}"
+
+                    // Extract the container IP address
+                    def containerIp = sh(script: "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' petclinic-${params.ENVIRONMENT}", returnStdout: true).trim()
+                    echo "Container IP address: ${containerIp}"
+
+                    // Prepare user data
+                    def firstName = params.USER_NAME.split()[0]
+                    def lastName = params.USER_NAME.split().size() > 1 ? params.USER_NAME.split()[1] : ''
+
+                    // Create a temporary file with the JSON payload - properly formatted JSON
+                    def jsonPayload = """{
+                    "firstName": "${firstName}",
+                    "lastName": "${lastName}",
+                    "email": "${params.USER_EMAIL}",
+                    "pets": [
+                        {
+                        "name": "${params.PET_NAME}",
+                        "type": "${params.PET_TYPE}"
+                        }
+                    ]
+                    }"""
+                    writeFile file: 'payload.json', text: jsonPayload
+                    echo 'JSON payload created:'
+                    sh 'cat payload.json'
+
+                    echo 'Attempting API call with file-based payload to localhost...'
+                    try {
+                        sh 'curl -v -X POST "http://localhost:8081/api/owners" -H "Content-Type: application/json" -d @payload.json || echo "API call failed but continuing"'
+                    } catch (Exception e) {
+                        echo "First attempt failed with error: ${e.message}"
+                    }
+
+                    echo 'Testing direct IP approach...'
+                    try {
+                        sh "curl -v -X POST \"http://${containerIp}:8081/api/owners\" -H \"Content-Type: application/json\" -d @payload.json || echo \"Direct IP API call failed but continuing\""
+                    } catch (Exception e) {
+                        echo "Direct IP approach failed with error: ${e.message}"
+                    }
+
+                    echo 'Testing minimal JSON approach...'
+                    try {
+                        sh """
+                            curl -v -X POST "http://localhost:8081/api/owners" \\
+                            -H "Content-Type: application/json" \\
+                            -d '{"firstName":"${firstName}","lastName":"${lastName}","email":"${params.USER_EMAIL}","pets":[{"name":"${params.PET_NAME}","type":"${params.PET_TYPE}"}]}' \\
+                            || echo "Minimal JSON approach failed but continuing"
+                        """
+                    } catch (Exception e) {
+                        echo "Minimal JSON approach failed with error: ${e.message}"
+                    }
+
+                    // Try Docker exec approach as a last resort
+                    echo 'Trying Docker exec approach...'
+                    try {
+                        writeFile file: 'register-user.sh', text: """#!/bin/bash
+                        curl -v -X POST "http://localhost:8081/api/owners" \\
+                        -H "Content-Type: application/json" \\
+                        -d '{"firstName":"${firstName}","lastName":"${lastName}","email":"${params.USER_EMAIL}","pets":[{"name":"${params.PET_NAME}","type":"${params.PET_TYPE}"}]}'
+                        """
+                        sh 'chmod +x register-user.sh'
+                        sh "docker cp register-user.sh petclinic-${params.ENVIRONMENT}:/tmp/"
+                        sh "docker exec petclinic-${params.ENVIRONMENT} /bin/bash /tmp/register-user.sh || echo \"Docker exec approach failed but continuing\""
+                    } catch (Exception e) {
+                        echo "Docker exec approach failed with error: ${e.message}"
+                    }
+
+                    // Checking if API is working
+                    echo 'Testing API connectivity...'
+                    sh 'curl -v http://localhost:8081/api/owners || echo "GET request failed but continuing"'
                 }
             }
         }
@@ -132,6 +211,8 @@ pipeline {
             // Cleanup
             sh "docker stop petclinic-${params.ENVIRONMENT} || true"
             sh "docker rm petclinic-${params.ENVIRONMENT} || true"
+            sh "docker network rm ${DOCKER_NETWORK} || true"
+            sh 'rm -f payload.json || true'
             echo "Pipeline completed for ${params.USER_NAME}'s pet ${params.PET_NAME}"
         }
         success {

@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path = "~/.kube/config"
+  config_path = "/etc/rancher/k3s/k3s.yaml"
 }
 
 # Create a namespace for the pet clinic
@@ -45,7 +45,7 @@ resource "kubernetes_deployment" "petclinic" {
         image_pull_secrets{
           name = "ghcr-secret"
         }
-        
+
         container {
           image = "ghcr.io/enea-dervishi/spring-petclinic:latest"
           name  = "petclinic"
