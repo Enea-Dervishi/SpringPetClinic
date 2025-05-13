@@ -91,5 +91,5 @@ variable "k8s_config_path" {
 variable "k8s_context" {
   description = "Kubernetes context to use"
   type        = string
-  default     = "k3d-petclinic-cluster"
+  default     = "default"
 }
