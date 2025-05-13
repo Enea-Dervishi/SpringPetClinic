@@ -92,7 +92,7 @@ pipeline {
                             // Copy k3d config to Jenkins workspace
                             sh """
                                 mkdir -p \$HOME/.kube
-                                cp /etc/rancher/k3s/k3s.yaml \$HOME/.kube/config
+                                cp /etc/rancher/k3s/jenkins-k3s.yaml \$HOME/.kube/config
                                 chmod 600 \$HOME/.kube/config
                                 
                                 rm -f .terraform.lock.hcl || true
