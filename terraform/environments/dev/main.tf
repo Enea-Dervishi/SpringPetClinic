@@ -21,4 +21,5 @@ module "petclinic" {
 
   # Kubernetes configuration
   k8s_config_path = var.k8s_config_path
+  k8s_context     = var.k8s_context
 }
