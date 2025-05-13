@@ -129,29 +129,29 @@ pipeline {
                     def petTypeId = [cat:1, dog:2, lizard:3, snake:4, bird:5, hamster:6][params.PET_TYPE]
 
                     // Add owner
-                    def ownerJson = groovy.json.JsonOutput.toJson([
+                    def ownerData = [
                         firstName: firstName,
                         lastName: lastName,
                         address: params.USER_ADDRESS,
                         city: params.USER_CITY,
                         telephone: params.USER_TELEPHONE
-                    ])
+                    ]
                     
-                    def ownerResponse = sh(
-                        script: "curl -s -X POST 'http://localhost:${env.NODE_PORT}/api/owners' -H 'Content-Type: application/json' -d '${ownerJson}'",
-                        returnStdout: true
-                    ).trim()
-
+                    def ownerJson = writeJSON(json: ownerData, returnText: true)
+                    def ownerCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners -H 'Content-Type: application/json' -d '${ownerJson}'"
+                    def ownerResponse = sh(script: ownerCmd, returnStdout: true).trim()
                     def ownerId = readJSON(text: ownerResponse).id
 
                     // Add pet
-                    def petJson = groovy.json.JsonOutput.toJson([
+                    def petData = [
                         name: params.PET_NAME,
                         birthDate: params.PET_BIRTH_DATE,
                         typeId: petTypeId
-                    ])
-
-                    sh "curl -s -X POST 'http://localhost:${env.NODE_PORT}/api/owners/${ownerId}/pets' -H 'Content-Type: application/json' -d '${petJson}'"
+                    ]
+                    
+                    def petJson = writeJSON(json: petData, returnText: true)
+                    def petCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners/${ownerId}/pets -H 'Content-Type: application/json' -d '${petJson}'"
+                    sh(script: petCmd)
                 }
             }
         }
