@@ -1,0 +1,1 @@
+{"Modules":[{"Key":"","Source":"","Dir":"."},{"Key":"mysql","Source":"../../modules/mysql","Dir":"../../modules/mysql"},{"Key":"petclinic","Source":"../../modules/kubernetes","Dir":"../../modules/kubernetes"}]}
