@@ -112,11 +112,14 @@ pipeline {
                     // Wait for application to be ready
                     timeout(5) {
                         waitUntil {
-                            def health = sh(
-                                script: "curl -s http://localhost:${env.NODE_PORT}/manage/health",
-                                returnStdout: true
-                            ).trim()
-                            return health.contains('"status":"UP"')
+                            script {
+                                def response = sh(
+                                    script: "curl -s -f http://localhost:${env.NODE_PORT}/manage/health || true",
+                                    returnStdout: true
+                                ).trim()
+                                
+                                return response.contains('"status":"UP"')
+                            }
                         }
                     }
 
@@ -138,8 +141,8 @@ pipeline {
                     
                     def ownerResponse = sh(
                         script: """
-                            curl -s -X POST "http://localhost:${env.NODE_PORT}/api/owners" \
-                            -H "Content-Type: application/json" \
+                            curl -s -X POST "http://localhost:${env.NODE_PORT}/api/owners" \\
+                            -H "Content-Type: application/json" \\
                             -d '${ownerJson}'
                         """,
                         returnStdout: true
@@ -157,8 +160,8 @@ pipeline {
                     """
 
                     sh """
-                        curl -s -X POST "http://localhost:${env.NODE_PORT}/api/owners/${ownerId}/pets" \
-                        -H "Content-Type: application/json" \
+                        curl -s -X POST "http://localhost:${env.NODE_PORT}/api/owners/${ownerId}/pets" \\
+                        -H "Content-Type: application/json" \\
                         -d '${petJson}'
                     """
                 }
