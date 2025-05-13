@@ -90,9 +90,14 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
                         dir('terraform/environments/dev') {
                             sh """
+                                rm -f .terraform.lock.hcl || true
                                 terraform init -upgrade
-                                terraform plan -var="ghcr_username=\${GITHUB_USERNAME}" -var="ghcr_token=\${GITHUB_TOKEN}"
-                                terraform apply -auto-approve -var="ghcr_username=\${GITHUB_USERNAME}" -var="ghcr_token=\${GITHUB_TOKEN}"
+                                terraform plan \\
+                                    -var="ghcr_username=\${GITHUB_USERNAME}" \\
+                                    -var="ghcr_token=\${GITHUB_TOKEN}"
+                                terraform apply -auto-approve \\
+                                    -var="ghcr_username=\${GITHUB_USERNAME}" \\
+                                    -var="ghcr_token=\${GITHUB_TOKEN}"
                             """
                         }
                     }

@@ -12,10 +12,12 @@ variable "mysql_root_password" {
   description = "MySQL root password"
   type        = string
   sensitive   = true
+  default     = "not_used"  # Default value since MySQL is not used
 }
 
 variable "mysql_password" {
   description = "MySQL user password"
   type        = string
   sensitive   = true
+  default     = "not_used"  # Default value since MySQL is not used
 } 
