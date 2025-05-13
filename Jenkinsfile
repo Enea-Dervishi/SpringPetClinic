@@ -87,12 +87,12 @@ pipeline {
             steps {
                 script {
                     // Deploy to k3d using Terraform
-                    dir('terraform') {
-                        sh '''
+                    dir('terraform/environments/dev') {
+                        sh """
                             terraform init
-                            terraform plan -var="tf_env=${params.ENVIRONMENT}"
-                            terraform apply -auto-approve -var="tf_env=${params.ENVIRONMENT}"
-                        '''
+                            terraform plan -var="ghcr_username=${GITHUB_USERNAME}" -var="ghcr_token=${GITHUB_TOKEN}"
+                            terraform apply -auto-approve -var="ghcr_username=${GITHUB_USERNAME}" -var="ghcr_token=${GITHUB_TOKEN}"
+                        """
                     }
 
                     // Wait for application to be ready
