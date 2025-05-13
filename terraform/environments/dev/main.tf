@@ -18,4 +18,7 @@ module "petclinic" {
   # GitHub Container Registry credentials
   ghcr_username = var.ghcr_username
   ghcr_token    = var.ghcr_token
+
+  # Kubernetes configuration
+  k8s_config_path = var.k8s_config_path
 }

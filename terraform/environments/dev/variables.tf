@@ -20,4 +20,10 @@ variable "mysql_password" {
   type        = string
   sensitive   = true
   default     = "not_used"  # Default value since MySQL is not used
+}
+
+variable "k8s_config_path" {
+  description = "Path to the kubeconfig file"
+  type        = string
+  default     = "~/.kube/config"
 } 
