@@ -81,3 +81,15 @@ variable "mysql_database" {
   type        = string
   default     = "petclinic"
 }
+
+variable "k8s_config_path" {
+  description = "Path to the kubeconfig file"
+  type        = string
+  default     = "~/.kube/config"
+}
+
+variable "k8s_context" {
+  description = "Kubernetes context to use"
+  type        = string
+  default     = "k3d-mycluster"
+}

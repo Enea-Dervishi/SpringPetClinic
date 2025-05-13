@@ -89,15 +89,22 @@ pipeline {
                     // Deploy to k3d using Terraform
                     withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
                         dir('terraform/environments/dev') {
+                            // Copy k3d config to Jenkins workspace
                             sh """
+                                mkdir -p \$HOME/.kube
+                                cp /etc/rancher/k3s/k3s.yaml \$HOME/.kube/config
+                                chmod 600 \$HOME/.kube/config
+                                
                                 rm -f .terraform.lock.hcl || true
                                 terraform init -upgrade
                                 terraform plan \\
                                     -var="ghcr_username=\${GITHUB_USERNAME}" \\
-                                    -var="ghcr_token=\${GITHUB_TOKEN}"
+                                    -var="ghcr_token=\${GITHUB_TOKEN}" \\
+                                    -var="k8s_config_path=\$HOME/.kube/config"
                                 terraform apply -auto-approve \\
                                     -var="ghcr_username=\${GITHUB_USERNAME}" \\
-                                    -var="ghcr_token=\${GITHUB_TOKEN}"
+                                    -var="ghcr_token=\${GITHUB_TOKEN}" \\
+                                    -var="k8s_config_path=\$HOME/.kube/config"
                             """
                         }
                     }
