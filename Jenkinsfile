@@ -129,28 +129,17 @@ pipeline {
                     def petTypeId = [cat:1, dog:2, lizard:3, snake:4, bird:5, hamster:6][params.PET_TYPE]
 
                     // Add owner
-                    def ownerData = [
-                        firstName: firstName,
-                        lastName: lastName,
-                        address: params.USER_ADDRESS,
-                        city: params.USER_CITY,
-                        telephone: params.USER_TELEPHONE
-                    ]
+                    def ownerJson = """{"firstName":"${firstName}","lastName":"${lastName}","address":"${params.USER_ADDRESS}","city":"${params.USER_CITY}","telephone":"${params.USER_TELEPHONE}"}"""
                     
-                    def ownerJson = writeJSON(json: ownerData, returnText: true)
-                    def ownerCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners -H 'Content-Type: application/json' -d '${ownerJson}'"
+                    def ownerCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners -H 'Content-Type: application/json' -d '" + ownerJson.replaceAll("'", "'\\''") + "'"
                     def ownerResponse = sh(script: ownerCmd, returnStdout: true).trim()
-                    def ownerId = readJSON(text: ownerResponse).id
+                    def responseJson = readJSON text: ownerResponse
+                    def ownerId = responseJson.id
 
                     // Add pet
-                    def petData = [
-                        name: params.PET_NAME,
-                        birthDate: params.PET_BIRTH_DATE,
-                        typeId: petTypeId
-                    ]
+                    def petJson = """{"name":"${params.PET_NAME}","birthDate":"${params.PET_BIRTH_DATE}","typeId":${petTypeId}}"""
                     
-                    def petJson = writeJSON(json: petData, returnText: true)
-                    def petCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners/${ownerId}/pets -H 'Content-Type: application/json' -d '${petJson}'"
+                    def petCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners/${ownerId}/pets -H 'Content-Type: application/json' -d '" + petJson.replaceAll("'", "'\\''") + "'"
                     sh(script: petCmd)
                 }
             }
