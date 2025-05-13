@@ -2,7 +2,7 @@ terraform {
   required_providers {
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.0"
+      version = "~> 2.36.0"
     }
   }
 }
@@ -19,7 +19,7 @@ locals {
 
 # Only create kubernetes module for now
 module "kubernetes" {
-  source = "./terraform/modules/kubernetes"
+  source = "./modules/kubernetes"
   
   environment        = var.tf_env
   namespace          = local.env_vars.namespace != null ? local.env_vars.namespace : var.namespace
