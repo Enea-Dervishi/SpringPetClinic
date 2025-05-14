@@ -1,0 +1,142 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+    }
+
+    parameters {
+        // Visit details
+        string(name: 'VISIT_DATE', defaultValue: '', description: 'Visit date (YYYY/MM/DD)')
+        text(name: 'VISIT_DESCRIPTION', description: 'Description of the visit')
+        
+        // Dynamic parameters using Active Choices plugin
+        activeChoice(
+            name: 'OWNER_PET_SELECTION',
+            description: 'Select Owner and Pet',
+            script: '''
+                def nodePort = '30081'
+                def response = new URL("http://localhost:${nodePort}/api/owners").getText('UTF-8')
+                def owners = new groovy.json.JsonSlurper().parseText(response)
+                
+                return owners.findAll { it.pets != null && !it.pets.isEmpty() }
+                    .collectMany { owner ->
+                        owner.pets.collect { pet ->
+                            "${owner.id}:${pet.id} - ${owner.firstName} ${owner.lastName} - ${pet.name}"
+                        }
+                    }
+            '''
+        )
+        
+        activeChoice(
+            name: 'VET_SELECTION',
+            description: 'Select Veterinarian',
+            script: '''
+                def nodePort = '30081'
+                def response = new URL("http://localhost:${nodePort}/api/vets").getText('UTF-8')
+                def vets = new groovy.json.JsonSlurper().parseText(response)
+                
+                return vets.collect { vet ->
+                    def specialties = vet.specialties.collect { it.name }.join(", ")
+                    "${vet.id} - ${vet.firstName} ${vet.lastName} - ${specialties}"
+                }
+            '''
+        )
+    }
+
+    environment {
+        NODE_PORT = '30081'
+    }
+
+    stages {
+        stage('Validate Input') {
+            steps {
+                script {
+                    // Visit date validation
+                    if (!params.VISIT_DATE?.trim()) {
+                        error 'Visit date cannot be empty'
+                    }
+                    if (!params.VISIT_DATE.matches('^\\d{4}/\\d{2}/\\d{2}$')) {
+                        error 'Visit date must be in YYYY/MM/DD format'
+                    }
+
+                    // Visit description validation
+                    if (!params.VISIT_DESCRIPTION?.trim()) {
+                        error 'Visit description cannot be empty'
+                    }
+
+                    // Owner/Pet selection validation
+                    if (!params.OWNER_PET_SELECTION?.trim()) {
+                        error 'Please select an owner and pet'
+                    }
+
+                    // Vet selection validation
+                    if (!params.VET_SELECTION?.trim()) {
+                        error 'Please select a veterinarian'
+                    }
+                }
+            }
+        }
+
+        stage('Check Application Health') {
+            steps {
+                script {
+                    // Check if the application is running and healthy
+                    def healthCheck = sh(
+                        script: """
+                            curl -s -f "http://localhost:${env.NODE_PORT}/manage/health" || echo 'failed'
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    if (!healthCheck.contains('"status":"UP"')) {
+                        error "PetClinic application is not running or not healthy. Please ensure it is deployed first."
+                    }
+                }
+            }
+        }
+
+        stage('Schedule Visit') {
+            steps {
+                script {
+                    // Parse selected owner:pet
+                    def (ownerId, petId) = params.OWNER_PET_SELECTION.split(':')[0..1]
+                    def vetId = params.VET_SELECTION.split(' - ')[0]
+                    
+                    // Format date for the API (YYYY-MM-DD)
+                    def formattedDate = params.VISIT_DATE.replace('/', '-')
+                    
+                    // Schedule the visit using form submission
+                    def visitResponse = sh(
+                        script: """
+                            curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/${ownerId}/pets/${petId}/visits/new" \\
+                                -H "Content-Type: application/x-www-form-urlencoded" \\
+                                -d "date=${URLEncoder.encode(formattedDate, 'UTF-8')}" \\
+                                -d "description=${URLEncoder.encode(params.VISIT_DESCRIPTION, 'UTF-8')}" \\
+                                -d "vetId=${URLEncoder.encode(vetId, 'UTF-8')}"
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Visit scheduling response: ${visitResponse}"
+                    
+                    // Verify the visit was scheduled successfully
+                    if (!visitResponse.contains('302') || !visitResponse.contains("/owners/${ownerId}")) {
+                        error "Failed to schedule the visit"
+                    }
+
+                    echo "Successfully scheduled visit for pet from owner ${ownerId}"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Successfully scheduled the visit!"
+        }
+        failure {
+            echo "Failed to schedule the visit. Please check the logs for details."
+        }
+    }
+} 
