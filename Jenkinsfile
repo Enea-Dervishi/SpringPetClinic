@@ -108,39 +108,105 @@ pipeline {
                             """
                         }
                     }
-
-                    // Wait for application to be ready
+        
+                    // Wait for application to be ready with better error handling
                     timeout(5) {
                         waitUntil {
                             script {
-                                def response = sh(
-                                    script: "curl -s -f http://localhost:${env.NODE_PORT}/manage/health || true",
-                                    returnStdout: true
-                                ).trim()
-                                
-                                return response.contains('"status":"UP"')
+                                try {
+                                    def response = sh(
+                                        script: "curl -s -f http://localhost:${env.NODE_PORT}/manage/health || echo 'failed'",
+                                        returnStdout: true
+                                    ).trim()
+                                    
+                                    echo "Health check response: ${response}"
+                                    return response.contains('"status":"UP"')
+                                } catch (Exception e) {
+                                    echo "Health check exception: ${e.message}"
+                                    return false
+                                }
                             }
                         }
                     }
-
-                    // Register owner and pet
-                    def firstName = params.USER_NAME.split()[0]
-                    def lastName = params.USER_NAME.split()[1..-1].join(' ')
-                    def petTypeId = [cat:1, dog:2, lizard:3, snake:4, bird:5, hamster:6][params.PET_TYPE]
-
-                    // Add owner
-                    def ownerJson = """{"firstName":"${firstName}","lastName":"${lastName}","address":"${params.USER_ADDRESS}","city":"${params.USER_CITY}","telephone":"${params.USER_TELEPHONE}"}"""
+        
+                    // Define user data
+                    def firstName = params.USER_NAME ? params.USER_NAME.split(' ')[0] : 'Default'
+                    def lastName = params.USER_NAME && params.USER_NAME.split(' ').size() > 1 ? 
+                        params.USER_NAME.split(' ')[1..-1].join(' ') : 'User'
                     
-                    def ownerCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners -H 'Content-Type: application/json' -d '" + ownerJson.replaceAll("'", "'\\''") + "'"
-                    def ownerResponse = sh(script: ownerCmd, returnStdout: true).trim()
-                    def responseJson = readJSON text: ownerResponse
-                    def ownerId = responseJson.id
-
-                    // Add pet
-                    def petJson = """{"name":"${params.PET_NAME}","birthDate":"${params.PET_BIRTH_DATE}","typeId":${petTypeId}}"""
+                    // Get pet type string
+                    def petType = params.PET_TYPE?.toString()?.toLowerCase() ?: 'cat'
                     
-                    def petCmd = "curl -s -X POST http://localhost:${env.NODE_PORT}/api/owners/${ownerId}/pets -H 'Content-Type: application/json' -d '" + petJson.replaceAll("'", "'\\''") + "'"
-                    sh(script: petCmd)
+                    // Make sure date is in correct YYYY-MM-DD format
+                    def petBirthDate = params.PET_BIRTH_DATE?.toString()?.replace('/', '-') ?: '2020-01-01'
+        
+                    // Create owner using form submission and capture the complete output with headers
+                    def ownerFormOutput = sh(
+                        script: """
+                            curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/new" \\
+                                -H "Content-Type: application/x-www-form-urlencoded" \\
+                                -d "firstName=${URLEncoder.encode(firstName, 'UTF-8')}" \\
+                                -d "lastName=${URLEncoder.encode(lastName, 'UTF-8')}" \\
+                                -d "address=${URLEncoder.encode(params.USER_ADDRESS ?: '', 'UTF-8')}" \\
+                                -d "city=${URLEncoder.encode(params.USER_CITY ?: '', 'UTF-8')}" \\
+                                -d "telephone=${URLEncoder.encode(params.USER_TELEPHONE ?: '', 'UTF-8')}"
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Owner form submission complete output: ${ownerFormOutput}"
+                    
+                    // Extract owner ID using simple string parsing instead of regex
+                    def ownerId = null
+                    ownerFormOutput.split('\n').each { line ->
+                        if (line.contains('Location:') && line.contains('/owners/')) {
+                            ownerId = line.substring(line.lastIndexOf('/') + 1).trim()
+                            echo "Successfully extracted owner ID: ${ownerId}"
+                        }
+                    }
+                    
+                    if (!ownerId) {
+                        error "Failed to extract owner ID from the response"
+                    }
+                    
+                    // Now add a pet using form submission
+                    def petFormOutput = sh(
+                        script: """
+                            curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/${ownerId}/pets/new" \\
+                                -H "Content-Type: application/x-www-form-urlencoded" \\
+                                -d "name=${URLEncoder.encode(params.PET_NAME ?: 'Pet', 'UTF-8')}" \\
+                                -d "birthDate=${URLEncoder.encode(petBirthDate, 'UTF-8')}" \\
+                                -d "typeId=1"
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Pet form submission complete output: ${petFormOutput}"
+                    
+                    // Check if the pet was added successfully (look for a redirect to the owner page)
+                    if (petFormOutput.contains("302") && petFormOutput.contains("/owners/${ownerId}")) {
+                        echo "Successfully registered pet ${params.PET_NAME} for owner ${params.USER_NAME} with ID ${ownerId}"
+                    } else {
+                        // Try with a different form field for pet type
+                        petFormOutput = sh(
+                            script: """
+                                curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/${ownerId}/pets/new" \\
+                                    -H "Content-Type: application/x-www-form-urlencoded" \\
+                                    -d "name=${URLEncoder.encode(params.PET_NAME ?: 'Pet', 'UTF-8')}" \\
+                                    -d "birthDate=${URLEncoder.encode(petBirthDate, 'UTF-8')}" \\
+                                    -d "type=${URLEncoder.encode(petType, 'UTF-8')}"
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        
+                        echo "Second pet form submission complete output: ${petFormOutput}"
+                        
+                        if (petFormOutput.contains("302") && petFormOutput.contains("/owners/${ownerId}")) {
+                            echo "Successfully registered pet ${params.PET_NAME} for owner ${params.USER_NAME} with ID ${ownerId}"
+                        } else {
+                            error "Failed to add pet for owner with ID ${ownerId}"
+                        }
+                    }
                 }
             }
         }
