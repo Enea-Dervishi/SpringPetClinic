@@ -6,41 +6,17 @@ pipeline {
     }
 
     parameters {
-        // Visit details
         string(name: 'VISIT_DATE', defaultValue: '', description: 'Visit date (YYYY/MM/DD)')
         text(name: 'VISIT_DESCRIPTION', description: 'Description of the visit')
-        
-        // Dynamic parameters using Active Choices plugin
-        activeChoice(
+        choice(
             name: 'OWNER_PET_SELECTION',
-            description: 'Select Owner and Pet',
-            script: '''
-                def nodePort = '30081'
-                def response = new URL("http://localhost:${nodePort}/api/owners").getText('UTF-8')
-                def owners = new groovy.json.JsonSlurper().parseText(response)
-                
-                return owners.findAll { it.pets != null && !it.pets.isEmpty() }
-                    .collectMany { owner ->
-                        owner.pets.collect { pet ->
-                            "${owner.id}:${pet.id} - ${owner.firstName} ${owner.lastName} - ${pet.name}"
-                        }
-                    }
-            '''
+            choices: ['NONE - First run will populate the list'],
+            description: 'Select Owner and Pet'
         )
-        
-        activeChoice(
+        choice(
             name: 'VET_SELECTION',
-            description: 'Select Veterinarian',
-            script: '''
-                def nodePort = '30081'
-                def response = new URL("http://localhost:${nodePort}/api/vets").getText('UTF-8')
-                def vets = new groovy.json.JsonSlurper().parseText(response)
-                
-                return vets.collect { vet ->
-                    def specialties = vet.specialties.collect { it.name }.join(", ")
-                    "${vet.id} - ${vet.firstName} ${vet.lastName} - ${specialties}"
-                }
-            '''
+            choices: ['NONE - First run will populate the list'],
+            description: 'Select Veterinarian'
         )
     }
 
@@ -49,6 +25,65 @@ pipeline {
     }
 
     stages {
+        stage('Update Choices') {
+            when {
+                expression { 
+                    return params.OWNER_PET_SELECTION == 'NONE - First run will populate the list' ||
+                           params.VET_SELECTION == 'NONE - First run will populate the list'
+                }
+            }
+            steps {
+                script {
+                    // Fetch owners and pets
+                    def ownersResponse = sh(
+                        script: """
+                            curl -s "http://localhost:${env.NODE_PORT}/api/owners"
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    def owners = readJSON text: ownersResponse
+                    def ownerPetChoices = []
+                    
+                    owners.each { owner ->
+                        if (owner.pets) {
+                            owner.pets.each { pet ->
+                                ownerPetChoices.add("${owner.id}:${pet.id} - ${owner.firstName} ${owner.lastName} - ${pet.name}")
+                            }
+                        }
+                    }
+                    
+                    // Fetch vets
+                    def vetsResponse = sh(
+                        script: """
+                            curl -s "http://localhost:${env.NODE_PORT}/api/vets"
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    def vets = readJSON text: vetsResponse
+                    def vetChoices = []
+                    
+                    vets.each { vet ->
+                        def specialties = vet.specialties.collect { it.name }.join(", ")
+                        vetChoices.add("${vet.id} - ${vet.firstName} ${vet.lastName} - ${specialties}")
+                    }
+
+                    // Update the job parameters
+                    properties([
+                        parameters([
+                            string(name: 'VISIT_DATE', defaultValue: '', description: 'Visit date (YYYY/MM/DD)'),
+                            text(name: 'VISIT_DESCRIPTION', description: 'Description of the visit'),
+                            choice(name: 'OWNER_PET_SELECTION', choices: ownerPetChoices, description: 'Select Owner and Pet'),
+                            choice(name: 'VET_SELECTION', choices: vetChoices, description: 'Select Veterinarian')
+                        ])
+                    ])
+
+                    error "Choices updated. Please run the pipeline again to schedule a visit."
+                }
+            }
+        }
+
         stage('Validate Input') {
             steps {
                 script {
@@ -66,12 +101,12 @@ pipeline {
                     }
 
                     // Owner/Pet selection validation
-                    if (!params.OWNER_PET_SELECTION?.trim()) {
+                    if (!params.OWNER_PET_SELECTION?.trim() || params.OWNER_PET_SELECTION.startsWith('NONE')) {
                         error 'Please select an owner and pet'
                     }
 
                     // Vet selection validation
-                    if (!params.VET_SELECTION?.trim()) {
+                    if (!params.VET_SELECTION?.trim() || params.VET_SELECTION.startsWith('NONE')) {
                         error 'Please select a veterinarian'
                     }
                 }
