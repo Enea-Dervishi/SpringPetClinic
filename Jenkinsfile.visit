@@ -37,18 +37,28 @@ pipeline {
                     // Fetch owners and pets
                     def ownersResponse = sh(
                         script: """
-                            curl -s "http://localhost:${env.NODE_PORT}/api/owners"
+                            curl -s "http://localhost:${env.NODE_PORT}/api/owners" | tr -d '\\n' | sed 's/},{/}\\n{/g'
                         """,
                         returnStdout: true
                     ).trim()
                     
-                    def owners = readJSON text: ownersResponse
                     def ownerPetChoices = []
                     
-                    owners.each { owner ->
-                        if (owner.pets) {
-                            owner.pets.each { pet ->
-                                ownerPetChoices.add("${owner.id}:${pet.id} - ${owner.firstName} ${owner.lastName} - ${pet.name}")
+                    // Parse owners response line by line
+                    ownersResponse.split('\n').each { line ->
+                        def ownerId = (line =~ /"id":(\d+)/)[0][1]
+                        def firstName = (line =~ /"firstName":"([^"]+)"/)[0][1]
+                        def lastName = (line =~ /"lastName":"([^"]+)"/)[0][1]
+                        
+                        // Check if pets array exists and is not empty
+                        if (line.contains('"pets":[{')) {
+                            def petsSection = line.substring(line.indexOf('"pets":[') + 7)
+                            petsSection = petsSection.substring(0, petsSection.indexOf(']'))
+                            
+                            petsSection.split('\\},\\{').each { petJson ->
+                                def petId = (petJson =~ /"id":(\d+)/)[0][1]
+                                def petName = (petJson =~ /"name":"([^"]+)"/)[0][1]
+                                ownerPetChoices.add("${ownerId}:${petId} - ${firstName} ${lastName} - ${petName}")
                             }
                         }
                     }
@@ -56,17 +66,35 @@ pipeline {
                     // Fetch vets
                     def vetsResponse = sh(
                         script: """
-                            curl -s "http://localhost:${env.NODE_PORT}/api/vets"
+                            curl -s "http://localhost:${env.NODE_PORT}/api/vets" | tr -d '\\n' | sed 's/},{/}\\n{/g'
                         """,
                         returnStdout: true
                     ).trim()
                     
-                    def vets = readJSON text: vetsResponse
                     def vetChoices = []
                     
-                    vets.each { vet ->
-                        def specialties = vet.specialties.collect { it.name }.join(", ")
-                        vetChoices.add("${vet.id} - ${vet.firstName} ${vet.lastName} - ${specialties}")
+                    // Parse vets response line by line
+                    vetsResponse.split('\n').each { line ->
+                        def vetId = (line =~ /"id":(\d+)/)[0][1]
+                        def firstName = (line =~ /"firstName":"([^"]+)"/)[0][1]
+                        def lastName = (line =~ /"lastName":"([^"]+)"/)[0][1]
+                        
+                        def specialties = []
+                        def specialtiesPattern = /"name":"([^"]+)"/
+                        def matcher = line =~ specialtiesPattern
+                        while (matcher.find()) {
+                            specialties.add(matcher.group(1))
+                        }
+                        
+                        vetChoices.add("${vetId} - ${firstName} ${lastName} - ${specialties.join(', ')}")
+                    }
+
+                    // Make sure we have at least one choice
+                    if (ownerPetChoices.isEmpty()) {
+                        ownerPetChoices.add("No owners with pets found")
+                    }
+                    if (vetChoices.isEmpty()) {
+                        vetChoices.add("No veterinarians found")
                     }
 
                     // Update the job parameters
@@ -101,12 +129,16 @@ pipeline {
                     }
 
                     // Owner/Pet selection validation
-                    if (!params.OWNER_PET_SELECTION?.trim() || params.OWNER_PET_SELECTION.startsWith('NONE')) {
+                    if (!params.OWNER_PET_SELECTION?.trim() || 
+                        params.OWNER_PET_SELECTION.startsWith('NONE') ||
+                        params.OWNER_PET_SELECTION == 'No owners with pets found') {
                         error 'Please select an owner and pet'
                     }
 
                     // Vet selection validation
-                    if (!params.VET_SELECTION?.trim() || params.VET_SELECTION.startsWith('NONE')) {
+                    if (!params.VET_SELECTION?.trim() || 
+                        params.VET_SELECTION.startsWith('NONE') ||
+                        params.VET_SELECTION == 'No veterinarians found') {
                         error 'Please select a veterinarian'
                     }
                 }
