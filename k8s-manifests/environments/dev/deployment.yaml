@@ -19,23 +19,23 @@ spec:
     spec:
       containers:
       - name: petclinic
-        image: ghcr.io/enea-dervishi/petclinic:dev-latest
+        image: springcommunity/spring-petclinic:latest
         ports:
-        - containerPort: 8081
+        - containerPort: 8080
           name: http
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "dev"
         livenessProbe:
           httpGet:
-            path: /manage/health
-            port: 8081
+            path: /actuator/health
+            port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /manage/health
-            port: 8081
+            path: /actuator/health
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
         resources:
