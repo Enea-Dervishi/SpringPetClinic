@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: petclinic
-        image: springcommunity/spring-petclinic:latest
+        image: arey/springboot-petclinic:latest
         ports:
         - containerPort: 8080
           name: http
