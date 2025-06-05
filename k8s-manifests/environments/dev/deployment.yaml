@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: petclinic
+  namespace: petclinic-dev
+  labels:
+    app: petclinic
+    environment: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: petclinic
+  template:
+    metadata:
+      labels:
+        app: petclinic
+        environment: dev
+    spec:
+      containers:
+      - name: petclinic
+        image: ghcr.io/enea-dervishi/petclinic:dev-latest
+        ports:
+        - containerPort: 8081
+          name: http
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "dev"
+        livenessProbe:
+          httpGet:
+            path: /manage/health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /manage/health
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      imagePullSecrets:
+      - name: ghcr-secret 
