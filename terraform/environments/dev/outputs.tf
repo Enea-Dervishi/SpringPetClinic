@@ -1,24 +1,19 @@
-output "namespace" {
-  description = "The namespace where the application is deployed"
-  value       = module.petclinic.namespace_name
+output "argocd_namespace" {
+  description = "The ArgoCD namespace"
+  value       = module.argocd.argocd_namespace
 }
 
-output "service_nodeport" {
-  description = "The NodePort of the service"
-  value       = module.petclinic.service_nodeport
+output "argocd_ui_url" {
+  description = "ArgoCD UI URL"
+  value       = module.argocd.argocd_ui_url
 }
 
-output "deployment_name" {
-  description = "The name of the deployment"
-  value       = module.petclinic.deployment_name
+output "application_name" {
+  description = "ArgoCD Application name"
+  value       = module.argocd.application_name
 }
 
-output "replicas" {
-  description = "Number of replicas in the deployment"
-  value       = module.petclinic.replicas
-}
-
-output "access_url" {
-  description = "URL to access the application"
-  value       = module.petclinic.access_url
+output "manifests_generated" {
+  description = "Path where manifests were generated"
+  value       = "k8s-manifests/environments/dev"
 }

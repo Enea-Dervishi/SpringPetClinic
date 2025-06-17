@@ -1,1 +1,1 @@
-{"Modules":[{"Key":"","Source":"","Dir":"."},{"Key":"mysql","Source":"../../modules/mysql","Dir":"../../modules/mysql"},{"Key":"petclinic","Source":"../../modules/kubernetes","Dir":"../../modules/kubernetes"}]}
+{"Modules":[{"Key":"","Source":"","Dir":"."},{"Key":"argocd","Source":"../../modules/argocd","Dir":"../../modules/argocd"},{"Key":"k8s_manifests","Source":"../../modules/k8s-manifests","Dir":"../../modules/k8s-manifests"}]}

@@ -1,11 +1,12 @@
 variable "ghcr_username" {
-  description = "GitHub username for Container Registry"
+  description = "GitHub Container Registry username"
   type        = string
 }
 
 variable "ghcr_token" {
-  description = "GitHub Personal Access Token for Container Registry"
+  description = "GitHub Container Registry token"
   type        = string
+  sensitive   = true
 }
 
 variable "mysql_root_password" {
@@ -23,7 +24,7 @@ variable "mysql_password" {
 }
 
 variable "k8s_config_path" {
-  description = "Path to the kubeconfig file"
+  description = "Path to Kubernetes config file"
   type        = string
   default     = "~/.kube/config"
 }
@@ -31,5 +32,11 @@ variable "k8s_config_path" {
 variable "k8s_context" {
   description = "Kubernetes context to use"
   type        = string
-  default     = "default"
+  default     = ""
+}
+
+variable "build_number" {
+  description = "Build number for image tagging"
+  type        = string
+  default     = ""
 } 

@@ -86,7 +86,7 @@ pipeline {
         stage('Deploy & Register') {
             steps {
                 script {
-                    // Deploy to k3d using Terraform
+                    // Deploy ArgoCD and generate manifests using Terraform
                     withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
                         dir('terraform/environments/dev') {
                             // Copy k3d config to Jenkins workspace
@@ -100,16 +100,65 @@ pipeline {
                                 terraform plan \\
                                     -var="ghcr_username=\${GITHUB_USERNAME}" \\
                                     -var="ghcr_token=\${GITHUB_TOKEN}" \\
-                                    -var="k8s_config_path=\$HOME/.kube/config"
+                                    -var="k8s_config_path=\$HOME/.kube/config" \\
+                                    -var="build_number=${BUILD_NUMBER}"
                                 terraform apply -auto-approve \\
                                     -var="ghcr_username=\${GITHUB_USERNAME}" \\
                                     -var="ghcr_token=\${GITHUB_TOKEN}" \\
-                                    -var="k8s_config_path=\$HOME/.kube/config"
+                                    -var="k8s_config_path=\$HOME/.kube/config" \\
+                                    -var="build_number=${BUILD_NUMBER}"
                             """
                         }
                     }
+
+                    // Commit and push generated manifests to trigger ArgoCD sync
+                    withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+                        sh """
+                            # Configure git
+                            git config user.name "Jenkins CI"
+                            git config user.email "jenkins@petclinic.local"
+                            
+                            # Add generated manifests
+                            git add k8s-manifests/environments/dev/
+                            
+                            # Check if there are changes to commit
+                            if git diff --staged --quiet; then
+                                echo "No changes to commit"
+                            else
+                                git commit -m "Update dev manifests for build ${BUILD_NUMBER}"
+                                git push https://\${GITHUB_USERNAME}:\${GITHUB_TOKEN}@github.com/enea-dervishi/SpringPetClinic.git HEAD:main
+                                echo "Pushed manifest changes to trigger ArgoCD sync"
+                            fi
+                        """
+                    }
+
+                    // Wait for ArgoCD to sync the application
+                    timeout(10) {
+                        sh """
+                            # Wait for ArgoCD to be ready
+                            kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || true
+                            
+                            # Login to ArgoCD CLI (using port-forward in background)
+                            kubectl port-forward svc/argocd-server -n argocd 8082:443 --address=0.0.0.0 &
+                            sleep 10
+                            
+                            # Get ArgoCD admin password
+                            ARGOCD_PASSWORD=\$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+                            
+                            # Login to ArgoCD
+                            argocd login localhost:8082 --username admin --password \$ARGOCD_PASSWORD --insecure
+                            
+                            # Sync the application
+                            argocd app sync petclinic-dev --timeout 300
+                            
+                            # Wait for sync to complete
+                            argocd app wait petclinic-dev --timeout 300
+                            
+                            echo "ArgoCD sync completed successfully"
+                        """
+                    }
         
-                    // Wait for application to be ready with better error handling
+                    // Wait for application to be ready
                     timeout(5) {
                         waitUntil {
                             script {
@@ -134,39 +183,97 @@ pipeline {
                     def lastName = params.USER_NAME && params.USER_NAME.split(' ').size() > 1 ? 
                         params.USER_NAME.split(' ')[1..-1].join(' ') : 'User'
                     
-                    // Get pet type string
-                    def petType = params.PET_TYPE?.toString()?.toLowerCase() ?: 'cat'
-                    
-                    // Make sure date is in correct YYYY-MM-DD format
-                    def petBirthDate = params.PET_BIRTH_DATE?.toString()?.replace('/', '-') ?: '2020-01-01'
-        
-                    // Create owner using form submission and capture the complete output with headers
-                    def ownerFormOutput = sh(
+                    // Check if owner already exists
+                    def searchResponse = sh(
                         script: """
-                            curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/new" \\
-                                -H "Content-Type: application/x-www-form-urlencoded" \\
-                                -d "firstName=${URLEncoder.encode(firstName, 'UTF-8')}" \\
-                                -d "lastName=${URLEncoder.encode(lastName, 'UTF-8')}" \\
-                                -d "address=${URLEncoder.encode(params.USER_ADDRESS ?: '', 'UTF-8')}" \\
-                                -d "city=${URLEncoder.encode(params.USER_CITY ?: '', 'UTF-8')}" \\
-                                -d "telephone=${URLEncoder.encode(params.USER_TELEPHONE ?: '', 'UTF-8')}"
+                            curl -s "http://localhost:${env.NODE_PORT}/owners/search?lastName=${URLEncoder.encode(lastName, 'UTF-8')}"
                         """,
                         returnStdout: true
                     ).trim()
                     
-                    echo "Owner form submission complete output: ${ownerFormOutput}"
+                    echo "Search response: ${searchResponse}"
                     
-                    // Extract owner ID using simple string parsing instead of regex
+                    // Parse the search results
+                    def existingOwner = false
                     def ownerId = null
-                    ownerFormOutput.split('\n').each { line ->
-                        if (line.contains('Location:') && line.contains('/owners/')) {
-                            ownerId = line.substring(line.lastIndexOf('/') + 1).trim()
-                            echo "Successfully extracted owner ID: ${ownerId}"
+                    
+                    // Convert search response to single line and escape quotes for proper parsing
+                    def normalizedResponse = searchResponse.replaceAll('\n', ' ').replaceAll('\r', '')
+                    echo "Normalized search response: ${normalizedResponse}"
+                    
+                    // Check if any owner matches all our criteria
+                    if (normalizedResponse.contains('"firstName":"' + firstName + '"')) {
+                        echo "Found owner with matching first name, checking other details..."
+                        
+                        // Extract all owner IDs for owners with matching first name
+                        def ownerIds = []
+                        def idPattern = /"id":(\d+)/
+                        def matcher = normalizedResponse =~ idPattern
+                        while (matcher.find()) {
+                            ownerIds.add(matcher.group(1))
+                        }
+                        
+                        // Check each owner's details
+                        for (String id : ownerIds) {
+                            def ownerDetailsResponse = sh(
+                                script: """
+                                    curl -s "http://localhost:${env.NODE_PORT}/owners/${id}"
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            
+                            echo "Checking owner ${id} details: ${ownerDetailsResponse}"
+                            
+                            // Check if all fields match
+                            if (ownerDetailsResponse.contains('"firstName":"' + firstName + '"') &&
+                                ownerDetailsResponse.contains('"lastName":"' + lastName + '"') &&
+                                ownerDetailsResponse.contains('"address":"' + params.USER_ADDRESS + '"') &&
+                                ownerDetailsResponse.contains('"city":"' + params.USER_CITY + '"') &&
+                                ownerDetailsResponse.contains('"telephone":"' + params.USER_TELEPHONE + '"')) {
+                                
+                                existingOwner = true
+                                ownerId = id
+                                echo "Found exact match with owner ID: ${ownerId}"
+                                
+                                // Check if this owner has a pet with the same name
+                                if (ownerDetailsResponse.contains('"name":"' + params.PET_NAME + '"')) {
+                                    error "Owner already has a pet named ${params.PET_NAME}"
+                                }
+                                break
+                            }
                         }
                     }
                     
-                    if (!ownerId) {
-                        error "Failed to extract owner ID from the response"
+                    if (existingOwner && ownerId) {
+                        echo "Using existing owner with ID: ${ownerId}"
+                    } else {
+                        // Create new owner if not found
+                        def ownerFormOutput = sh(
+                            script: """
+                                curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/new" \\
+                                    -H "Content-Type: application/x-www-form-urlencoded" \\
+                                    -d "firstName=${URLEncoder.encode(firstName, 'UTF-8')}" \\
+                                    -d "lastName=${URLEncoder.encode(lastName, 'UTF-8')}" \\
+                                    -d "address=${URLEncoder.encode(params.USER_ADDRESS ?: '', 'UTF-8')}" \\
+                                    -d "city=${URLEncoder.encode(params.USER_CITY ?: '', 'UTF-8')}" \\
+                                    -d "telephone=${URLEncoder.encode(params.USER_TELEPHONE ?: '', 'UTF-8')}"
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        
+                        echo "Owner form submission complete output: ${ownerFormOutput}"
+                        
+                        // Extract owner ID using simple string parsing
+                        ownerFormOutput.split('\n').each { line ->
+                            if (line.contains('Location:') && line.contains('/owners/')) {
+                                ownerId = line.substring(line.lastIndexOf('/') + 1).trim()
+                                echo "Successfully created new owner with ID: ${ownerId}"
+                            }
+                        }
+                        
+                        if (!ownerId) {
+                            error "Failed to extract owner ID from the response"
+                        }
                     }
                     
                     // Now add a pet using form submission
@@ -175,8 +282,8 @@ pipeline {
                             curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/${ownerId}/pets/new" \\
                                 -H "Content-Type: application/x-www-form-urlencoded" \\
                                 -d "name=${URLEncoder.encode(params.PET_NAME ?: 'Pet', 'UTF-8')}" \\
-                                -d "birthDate=${URLEncoder.encode(petBirthDate, 'UTF-8')}" \\
-                                -d "typeId=1"
+                                -d "birthDate=${URLEncoder.encode(params.PET_BIRTH_DATE?.toString()?.replace('/', '-') ?: '2020-01-01', 'UTF-8')}" \\
+                                -d "type=${URLEncoder.encode(params.PET_TYPE?.toString()?.toLowerCase() ?: 'cat', 'UTF-8')}"
                         """,
                         returnStdout: true
                     ).trim()
@@ -187,25 +294,7 @@ pipeline {
                     if (petFormOutput.contains("302") && petFormOutput.contains("/owners/${ownerId}")) {
                         echo "Successfully registered pet ${params.PET_NAME} for owner ${params.USER_NAME} with ID ${ownerId}"
                     } else {
-                        // Try with a different form field for pet type
-                        petFormOutput = sh(
-                            script: """
-                                curl -i -s -X POST "http://localhost:${env.NODE_PORT}/owners/${ownerId}/pets/new" \\
-                                    -H "Content-Type: application/x-www-form-urlencoded" \\
-                                    -d "name=${URLEncoder.encode(params.PET_NAME ?: 'Pet', 'UTF-8')}" \\
-                                    -d "birthDate=${URLEncoder.encode(petBirthDate, 'UTF-8')}" \\
-                                    -d "type=${URLEncoder.encode(petType, 'UTF-8')}"
-                            """,
-                            returnStdout: true
-                        ).trim()
-                        
-                        echo "Second pet form submission complete output: ${petFormOutput}"
-                        
-                        if (petFormOutput.contains("302") && petFormOutput.contains("/owners/${ownerId}")) {
-                            echo "Successfully registered pet ${params.PET_NAME} for owner ${params.USER_NAME} with ID ${ownerId}"
-                        } else {
-                            error "Failed to add pet for owner with ID ${ownerId}"
-                        }
+                        error "Failed to add pet for owner with ID ${ownerId}"
                     }
                 }
             }

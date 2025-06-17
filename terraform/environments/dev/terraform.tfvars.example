@@ -1,0 +1,7 @@
+# GitHub Container Registry credentials
+ghcr_username = "your-github-username"
+ghcr_token    = "your-github-token"
+
+# Environment configuration
+environment = "dev"
+replicas    = 1 

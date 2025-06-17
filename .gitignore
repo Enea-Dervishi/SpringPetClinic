@@ -14,3 +14,13 @@ target/*
 !.vscode/launch.json
 !.vscode/extensions.json
 _site/
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfplan
+*.tfplan.*
+.terraformrc
+terraform.rc
