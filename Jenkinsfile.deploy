@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+    parameters {
+        string(name: 'USER_NAME', description: 'Your full name')
+        string(name: 'USER_ADDRESS', description: 'Your address')
+        string(name: 'USER_CITY', description: 'Your city')
+        string(name: 'USER_TELEPHONE', description: 'Your telephone number')
+        string(name: 'PET_NAME', description: 'Your pet\'s name')
+        choice(name: 'PET_TYPE', choices: ['cat', 'dog', 'lizard', 'snake', 'bird', 'hamster'], description: 'Type of pet')
+        string(name: 'PET_BIRTH_DATE', defaultValue: '2020/01/01', description: 'Pet\'s birth date (YYYY/MM/DD)')
+        string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev/staging/prod)')
+    }
+    environment {
+        GITHUB_USERNAME = 'enea-dervishi'
+        DOCKER_IMAGE = "ghcr.io/${GITHUB_USERNAME}/petclinic:${params.ENVIRONMENT}-${BUILD_NUMBER}"
+        APP_PORT = '8081'
+        NODE_PORT = '30081'
+    }
+    stages {
+        stage('Deploy & Register') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+                        dir('terraform/environments/dev') {
+                            sh """
+                                mkdir -p \$HOME/.kube
+                                cp /etc/rancher/k3s/jenkins-k3s.yaml \$HOME/.kube/config
+                                chmod 600 \$HOME/.kube/config
+                                rm -f .terraform.lock.hcl || true
+                                terraform init -upgrade
+                                terraform plan \
+                                    -var=\"ghcr_username=\${GITHUB_USERNAME}\" \
+                                    -var=\"ghcr_token=\${GITHUB_TOKEN}\" \
+                                    -var=\"k8s_config_path=\$HOME/.kube/config\" \
+                                    -var=\"build_number=${BUILD_NUMBER}\"
+                                terraform apply -auto-approve \
+                                    -var=\"ghcr_username=\${GITHUB_USERNAME}\" \
+                                    -var=\"ghcr_token=\${GITHUB_TOKEN}\" \
+                                    -var=\"k8s_config_path=\$HOME/.kube/config\" \
+                                    -var=\"build_number=${BUILD_NUMBER}\"
+                            """
+                        }
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
+                        sh """
+                            git config user.name \"Jenkins CI\"
+                            git config user.email \"jenkins@petclinic.local\"
+                            git add k8s-manifests/environments/dev/
+                            if git diff --staged --quiet; then
+                                echo \"No changes to commit\"
+                            else
+                                git commit -m \"Update dev manifests for build ${BUILD_NUMBER}\"
+                                git push https://\${GITHUB_USERNAME}:\${GITHUB_TOKEN}@github.com/enea-dervishi/SpringPetClinic.git HEAD:main
+                                echo \"Pushed manifest changes to trigger ArgoCD sync\"
+                            fi
+                        """
+                    }
+                    timeout(10) {
+                        sh """
+                            kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || true
+                            kubectl port-forward svc/argocd-server -n argocd 8082:443 --address=0.0.0.0 &
+                            sleep 10
+                            ARGOCD_PASSWORD=\$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d)
+                            argocd login localhost:8082 --username admin --password \$ARGOCD_PASSWORD --insecure
+                            argocd app sync petclinic-dev --timeout 300
+                            argocd app wait petclinic-dev --timeout 300
+                            echo \"ArgoCD sync completed successfully\"
+                        """
+                    }
+                }
+            }
+        }
+    }
+} 

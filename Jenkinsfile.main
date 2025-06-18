@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+    parameters {
+        string(name: 'USER_NAME', description: 'Your full name')
+        string(name: 'USER_ADDRESS', description: 'Your address')
+        string(name: 'USER_CITY', description: 'Your city')
+        string(name: 'USER_TELEPHONE', description: 'Your telephone number')
+        string(name: 'PET_NAME', description: 'Your pet\'s name')
+        choice(name: 'PET_TYPE', choices: ['cat', 'dog', 'lizard', 'snake', 'bird', 'hamster'], description: 'Type of pet')
+        string(name: 'PET_BIRTH_DATE', defaultValue: '2020/01/01', description: 'Pet\'s birth date (YYYY/MM/DD)')
+        string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev/staging/prod)')
+    }
+    stages {
+        stage('Validate Input') {
+            steps {
+                build job: 'SpringPetClinic-Validate', parameters: [
+                    string(name: 'USER_NAME', value: params.USER_NAME),
+                    string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
+                    string(name: 'USER_CITY', value: params.USER_CITY),
+                    string(name: 'USER_TELEPHONE', value: params.USER_TELEPHONE),
+                    string(name: 'PET_NAME', value: params.PET_NAME),
+                    string(name: 'PET_TYPE', value: params.PET_TYPE),
+                    string(name: 'PET_BIRTH_DATE', value: params.PET_BIRTH_DATE),
+                    string(name: 'ENVIRONMENT', value: params.ENVIRONMENT)
+                ]
+            }
+        }
+        stage('Build & Test') {
+            steps {
+                build job: 'SpringPetClinic-Build', parameters: [
+                    string(name: 'USER_NAME', value: params.USER_NAME),
+                    string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
+                    string(name: 'USER_CITY', value: params.USER_CITY),
+                    string(name: 'USER_TELEPHONE', value: params.USER_TELEPHONE),
+                    string(name: 'PET_NAME', value: params.PET_NAME),
+                    string(name: 'PET_TYPE', value: params.PET_TYPE),
+                    string(name: 'PET_BIRTH_DATE', value: params.PET_BIRTH_DATE),
+                    string(name: 'ENVIRONMENT', value: params.ENVIRONMENT)
+                ]
+            }
+        }
+        stage('Build & Push Docker Image') {
+            steps {
+                build job: 'SpringPetClinic-Docker', parameters: [
+                    string(name: 'USER_NAME', value: params.USER_NAME),
+                    string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
+                    string(name: 'USER_CITY', value: params.USER_CITY),
+                    string(name: 'USER_TELEPHONE', value: params.USER_TELEPHONE),
+                    string(name: 'PET_NAME', value: params.PET_NAME),
+                    string(name: 'PET_TYPE', value: params.PET_TYPE),
+                    string(name: 'PET_BIRTH_DATE', value: params.PET_BIRTH_DATE),
+                    string(name: 'ENVIRONMENT', value: params.ENVIRONMENT)
+                ]
+            }
+        }
+        stage('Deploy & Register') {
+            steps {
+                build job: 'SpringPetClinic-Deploy', parameters: [
+                    string(name: 'USER_NAME', value: params.USER_NAME),
+                    string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
+                    string(name: 'USER_CITY', value: params.USER_CITY),
+                    string(name: 'USER_TELEPHONE', value: params.USER_TELEPHONE),
+                    string(name: 'PET_NAME', value: params.PET_NAME),
+                    string(name: 'PET_TYPE', value: params.PET_TYPE),
+                    string(name: 'PET_BIRTH_DATE', value: params.PET_BIRTH_DATE),
+                    string(name: 'ENVIRONMENT', value: params.ENVIRONMENT)
+                ]
+            }
+        }
+    }
+} 
