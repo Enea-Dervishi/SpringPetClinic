@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage('Validate Input') {
             steps {
-                build job: 'SpringPetClinic-Validate', parameters: [
+                build job: 'Petclinic/PipelineMatrix/Validate', parameters: [
                     string(name: 'USER_NAME', value: params.USER_NAME),
                     string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
                     string(name: 'USER_CITY', value: params.USER_CITY),
@@ -27,7 +27,7 @@ pipeline {
         }
         stage('Build & Test') {
             steps {
-                build job: 'SpringPetClinic-Build', parameters: [
+                build job: 'Petclinic/PipelineMatrix/Build', parameters: [
                     string(name: 'USER_NAME', value: params.USER_NAME),
                     string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
                     string(name: 'USER_CITY', value: params.USER_CITY),
@@ -41,7 +41,7 @@ pipeline {
         }
         stage('Build & Push Docker Image') {
             steps {
-                build job: 'SpringPetClinic-Docker', parameters: [
+                build job: 'Petclinic/PipelineMatrix/docker', parameters: [
                     string(name: 'USER_NAME', value: params.USER_NAME),
                     string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
                     string(name: 'USER_CITY', value: params.USER_CITY),
@@ -55,7 +55,7 @@ pipeline {
         }
         stage('Deploy & Register') {
             steps {
-                build job: 'SpringPetClinic-Deploy', parameters: [
+                build job: 'Petclinic/PipelineMatrix/deploy', parameters: [
                     string(name: 'USER_NAME', value: params.USER_NAME),
                     string(name: 'USER_ADDRESS', value: params.USER_ADDRESS),
                     string(name: 'USER_CITY', value: params.USER_CITY),

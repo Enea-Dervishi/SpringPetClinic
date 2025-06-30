@@ -19,6 +19,11 @@ pipeline {
     stages {
         stage('Deploy & Register') {
             steps {
+                copyArtifacts(
+                    projectName: 'Petclinic/PipelineMatrix/Build',
+                    selector: latestSuccessful(),
+                    filter: 'target/*.jar'
+                )
                 script {
                     withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
                         dir('terraform/environments/dev') {

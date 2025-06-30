@@ -17,6 +17,11 @@ pipeline {
     stages {
         stage('Build & Push Docker Image') {
             steps {
+                copyArtifacts(
+                    projectName: 'Petclinic/PipelineMatrix/Build',
+                    selector: latestSuccessful(),
+                    filter: 'target/*.jar'
+                )
                 script {
                     withCredentials([usernamePassword(credentialsId: 'github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN')]) {
                         sh """
