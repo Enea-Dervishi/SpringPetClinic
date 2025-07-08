@@ -37,7 +37,7 @@ resource "kubernetes_manifest" "petclinic_application" {
       source = {
         repoURL        = var.git_repo_url
         targetRevision = var.git_branch
-        path           = "k8s-manifests/environments/${var.environment}"
+        path           = "k8s/overlays/${var.environment}"
       }
       destination = {
         server    = "https://kubernetes.default.svc"
@@ -70,7 +70,7 @@ resource "kubernetes_service" "argocd_server_nodeport" {
     
     port {
       port        = 80
-      target_port = 8080
+      target_port = 8085
       node_port   = var.argocd_node_port
       protocol    = "TCP"
       name        = "http"
@@ -78,7 +78,7 @@ resource "kubernetes_service" "argocd_server_nodeport" {
     
     port {
       port        = 443
-      target_port = 8080
+      target_port = 8085
       node_port   = var.argocd_https_node_port
       protocol    = "TCP"
       name        = "https"

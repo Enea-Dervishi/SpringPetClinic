@@ -144,3 +144,17 @@
 ## Materiale consultabile
 - https://plugins.jenkins.io/templating-engine/
 - https://jenkinsci.github.io/templating-engine-plugin/2.5.3/
+
+
+
+
+todo: invoke terraform and it deploys argcd
+after argocd is up, start petclinic deploy
+using api create user and pet and do other stuff 
+
+
+2 pipelines
+1 STARTUP ALL - terraform, argocd & app
+1 DESTROY EVERYTHING 
+
+interact through interface or api calls 

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: petclinic
+  labels:
+    app: petclinic
+    framework: spring-boot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: petclinic
+  template:
+    metadata:
+      labels:
+        app: petclinic
+        framework: spring-boot
+    spec:
+      containers:
+      - name: petclinic
+        image: springcommunity/spring-petclinic:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "default"
+        - name: JAVA_OPTS
+          value: "-Xmx512m -Xms256m"
+        envFrom:
+        - configMapRef:
+            name: petclinic-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "768Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        volumeMounts:
+        - name: app-config
+          mountPath: /config
+      volumes:
+      - name: app-config
+        configMap:
+          name: petclinic-config
