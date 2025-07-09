@@ -3,3 +3,7 @@ kind: Kustomization
 
 resources:
   - ../../base 
+images:
+  - name: arey/springboot-petclinic
+    newName: ghcr.io/enea-dervishi/petclinic
+    newTag: prod-1 

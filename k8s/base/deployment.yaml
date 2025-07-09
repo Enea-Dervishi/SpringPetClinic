@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: petclinic
-        image: arey/springboot-petclinic:latest
+        image: ghcr.io/enea-dervishi/petclinic:latest
         ports:
         - containerPort: 8081
           name: http
@@ -29,13 +29,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /actuator/health
-            port: 8081
+            port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /actuator/health
-            port: 8081
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
         resources:
