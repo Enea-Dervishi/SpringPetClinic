@@ -2,10 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: petclinic
-  namespace: petclinic-dev
   labels:
     app: petclinic
-    environment: dev
 spec:
   replicas: 1
   selector:
@@ -15,35 +13,38 @@ spec:
     metadata:
       labels:
         app: petclinic
-        environment: dev
     spec:
       containers:
       - name: petclinic
         image: ghcr.io/enea-dervishi/petclinic:latest
         ports:
-        - containerPort: 8081
+        - containerPort: 8085
           name: http
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "dev"
+        - name: SERVER_PORT
+          value: "8085"  # Change from 8081 to 8085
         livenessProbe:
           httpGet:
-            path: /actuator/health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
+            path: /manage/health   
+            port: 8085              
+          initialDelaySeconds: 120  
+          periodSeconds: 30
+          timeoutSeconds: 5
         readinessProbe:
           httpGet:
-            path: /actuator/health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
+            path: /manage/health   
+            port: 8085  # Change from 8081 to 8085
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "250m"
+            cpu: 250m
+            memory: 256Mi
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            cpu: 500m
+            memory: 512Mi
       imagePullSecrets:
-      - name: ghcr-secret 
+      - name: ghcr-secret

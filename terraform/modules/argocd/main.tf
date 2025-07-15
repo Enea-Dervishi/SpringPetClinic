@@ -1,5 +1,6 @@
 # ArgoCD Installation and Configuration Module
 
+# Create ArgoCD namespace
 resource "kubernetes_namespace" "argocd" {
   metadata {
     name = "argocd"
@@ -11,21 +12,24 @@ data "http" "argocd_install" {
   url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
 }
 
-# Split the YAML manifests and apply them
 resource "kubectl_manifest" "argocd_install" {
   for_each = {
     for manifest in split("---", data.http.argocd_install.response_body) :
-    "${sha1(manifest)}" => manifest
-    if length(regexall("(?m)^(kind|apiVersion):", manifest)) > 1
+      "${sha1(manifest)}" => manifest
+    #if length(regexall("(?m)^(kind|apiVersion):", manifest)) > 1
   }
   
   yaml_body = each.value
   depends_on = [kubernetes_namespace.argocd]
 }
 
-# Create ArgoCD Application for PetClinic
-resource "kubernetes_manifest" "petclinic_application" {
-  manifest = {
+resource "time_sleep" "wait_for_argocd" {
+  depends_on = [kubectl_manifest.argocd_install]
+  create_duration = "300s"
+}
+
+resource "kubectl_manifest" "petclinic_application" {
+  yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
@@ -53,12 +57,11 @@ resource "kubernetes_manifest" "petclinic_application" {
         ]
       }
     }
-  }
+  })
   
-  depends_on = [kubectl_manifest.argocd_install]
+  depends_on = [time_sleep.wait_for_argocd]
 }
 
-# Service to expose ArgoCD UI
 resource "kubernetes_service" "argocd_server_nodeport" {
   metadata {
     name      = "argocd-server-nodeport"
@@ -70,7 +73,7 @@ resource "kubernetes_service" "argocd_server_nodeport" {
     
     port {
       port        = 80
-      target_port = 8085
+      target_port = 8080
       node_port   = var.argocd_node_port
       protocol    = "TCP"
       name        = "http"
@@ -78,7 +81,7 @@ resource "kubernetes_service" "argocd_server_nodeport" {
     
     port {
       port        = 443
-      target_port = 8085
+      target_port = 8080
       node_port   = var.argocd_https_node_port
       protocol    = "TCP"
       name        = "https"
@@ -90,4 +93,4 @@ resource "kubernetes_service" "argocd_server_nodeport" {
   }
   
   depends_on = [kubectl_manifest.argocd_install]
-} 
+}

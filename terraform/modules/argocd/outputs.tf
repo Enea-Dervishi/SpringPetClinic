@@ -15,5 +15,20 @@ output "argocd_ui_url" {
 
 output "application_name" {
   description = "ArgoCD Application name"
-  value       = kubernetes_manifest.petclinic_application.manifest.metadata.name
-} 
+  value       = "petclinic-${var.environment}"
+}
+
+output "application_namespace" {
+  description = "Application target namespace"
+  value       = var.app_namespace
+}
+
+output "argocd_server_nodeport" {
+  description = "ArgoCD server NodePort"
+  value       = var.argocd_node_port
+}
+
+output "argocd_https_nodeport" {
+  description = "ArgoCD server HTTPS NodePort"
+  value       = var.argocd_https_node_port
+}

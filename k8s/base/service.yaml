@@ -14,4 +14,4 @@ spec:
     nodePort: 30082
     name: http
   selector:
-    app: petclinic 
+    app: petclinic   
