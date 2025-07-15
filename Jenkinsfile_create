@@ -2,31 +2,13 @@ pipeline {
     agent {
         kubernetes {
             yaml '''
-      apiVersion: v1
+apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
   containers:
-  - name: terraform
-    image: hashicorp/terraform:1.7.5
-    command: ["sleep"]
-    args: ["infinity"]
-    env:
-    - name: AWS_DEFAULT_REGION
-      value: "us-west-2"
-    volumeMounts:
-    - name: terraform-cache
-      mountPath: /tmp/.terraform
-    resources:
-      requests:
-        memory: "512Mi"
-        cpu: "500m"
-      limits:
-        memory: "1Gi"
-        cpu: "1000m"
-
   - name: kubectl
-    image: bitnami/kubectl:1.28
+    image: alpine:3.18
     command: ["sleep"]
     args: ["infinity"]
     resources:
@@ -36,34 +18,83 @@ spec:
       limits:
         memory: "256Mi"
         cpu: "200m"
-
+  - name: maven
+    image: maven:3.8.7-eclipse-temurin-8
+    command: ["sleep"]
+    args: ["infinity"]
+    volumeMounts:
+    - name: maven-cache
+      mountPath: /root/.m2
   volumes:
-  - name: terraform-cache
-    emptyDir: {}
-      '''
+  - name: maven-cache
+    persistentVolumeClaim:
+      claimName: maven-cache-pvc
+            '''
         }
     }
-
     parameters {
         choice(
             name: 'CHOOSE_ENVIRONMENT',
             choices: ['dev', 'prod', 'staging'],
             description: 'Which Environment do you want to start?'
-      )
+        )
     }
-
     stages {
-        stage('Create resources'){
-          steps{
-            container('kubectl'){
-              script{
-                  //sh "kubectl apply -k k8s/overlays/${params.CHOOSE_ENVIRONMENT}"
-                  sh "kubectl apply -k k8s/overlays/dev"
-
-              }
-
+        stage('Setup kubectl') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        apk add --no-cache curl
+                        curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl"
+                        chmod +x kubectl
+                        mv kubectl /usr/local/bin/
+                        kubectl version --client
+                    '''
+                }
             }
-          }
+        }
+        stage('Test kubectl') {
+            steps {
+                container('kubectl') {
+                    sh 'kubectl get nodes'
+                }
+            }
+        }
+        stage('Create resources') {
+            steps {
+                container('kubectl') {
+                    sh "kubectl apply -k k8s/overlays/${params.CHOOSE_ENVIRONMENT}"
+                }
+            }
+        }
+        stage('Run App and Port Forward') {
+            parallel {
+                stage('Start App') {
+                    steps {
+                        container('maven') {
+                            sh 'mvn spring-boot:run'
+                        }
+                    }
+                }
+                stage('Port Forward') {
+                    steps {
+                        container('kubectl') {
+                            script {
+                                sh 'sleep 30'
+
+                                def podName = sh(
+                                    script: "kubectl get pods -l app=petclinic -o jsonpath='{.items[0].metadata.name}'",
+                                    returnStdout: true
+                                ).trim()
+
+                                echo "Port forwarding to pod: ${podName}"
+
+                                sh "kubectl port-forward pod/${podName} 8085:8085"
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
