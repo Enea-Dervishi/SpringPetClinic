@@ -1,0 +1,69 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml '''
+      apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  containers:
+  - name: terraform
+    image: hashicorp/terraform:1.7.5
+    command: ["sleep"]
+    args: ["infinity"]
+    env:
+    - name: AWS_DEFAULT_REGION
+      value: "us-west-2"
+    volumeMounts:
+    - name: terraform-cache
+      mountPath: /tmp/.terraform
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+
+  - name: kubectl
+    image: bitnami/kubectl:1.28
+    command: ["sleep"]
+    args: ["infinity"]
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+  volumes:
+  - name: terraform-cache
+    emptyDir: {}
+      '''
+        }
+    }
+
+    parameters {
+        choice(
+            name: 'CHOOSE_ENVIRONMENT',
+            choices: ['dev', 'prod', 'staging'],
+            description: 'Which Environment do you want to start?'
+      )
+    }
+
+    stages {
+        stage('Create resources'){
+          steps{
+            container('kubectl'){
+              script{
+                  //sh "kubectl apply -k k8s/overlays/${params.CHOOSE_ENVIRONMENT}"
+                  sh "kubectl apply -k k8s/overlays/dev"
+
+              }
+
+            }
+          }
+        }
+    }
+}
