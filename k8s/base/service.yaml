@@ -9,9 +9,9 @@ metadata:
 spec:
   type: NodePort
   ports:
-  - port: 8081
-    targetPort: 8081
-    nodePort: 30082
+  - port: 8085          #servizio esposto all'interno del cluster
+    targetPort: 8080    #porta in ascolto all'interno del pod
+    nodePort: 30082     #raggiungibile dall'esterno del cluster aka online
     name: http
   selector:
     app: petclinic   

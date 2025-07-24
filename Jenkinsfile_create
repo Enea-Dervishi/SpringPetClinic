@@ -1,14 +1,15 @@
 pipeline {
     agent {
         kubernetes {
+            //limitlescli add container
             yaml '''
 apiVersion: v1
 kind: Pod
 spec:
   serviceAccountName: jenkins
   containers:
-  - name: kubectl
-    image: alpine:3.18
+  - name: limitless 
+    image: factorysrl/limitlessdx-cli:0.0.8.1
     command: ["sleep"]
     args: ["infinity"]
     resources:
@@ -18,83 +19,145 @@ spec:
       limits:
         memory: "256Mi"
         cpu: "200m"
-  - name: maven
-    image: maven:3.8.7-eclipse-temurin-8
+  - name: terraform
+    image: hashicorp/terraform:1.5
     command: ["sleep"]
     args: ["infinity"]
-    volumeMounts:
-    - name: maven-cache
-      mountPath: /root/.m2
-  volumes:
-  - name: maven-cache
-    persistentVolumeClaim:
-      claimName: maven-cache-pvc
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
             '''
         }
     }
+    
     parameters {
         choice(
             name: 'CHOOSE_ENVIRONMENT',
             choices: ['dev', 'prod', 'staging'],
             description: 'Which Environment do you want to start?'
         )
+        choice(
+            name: 'IMAGE_TAG',
+            choices: ['latest', 'dev-4', 'dev-3', 'dev-1', 'dev-91', 'dev-90', 'dev-89', 'staging-88', 'dev-87', 'dev-85', 'dev-84'],
+            description: 'Which Docker image version to deploy?'
+        )
     }
+    
+    environment {
+        DOCKER_IMAGE = "ghcr.io/enea-dervishi/petclinic"
+        NAMESPACE = "petclinic-${params.CHOOSE_ENVIRONMENT}"
+    }
+    
     stages {
-        stage('Setup kubectl') {
+        
+        stage('Create Namespace') {
             steps {
-                container('kubectl') {
+                container('limitless') {
+                    sh "kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -"
+                }
+            }
+        }
+        
+        stage('Deploy Application') {
+            steps {
+                container('limitless') {
                     sh '''
-                        apk add --no-cache curl
-                        curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl"
-                        chmod +x kubectl
-                        mv kubectl /usr/local/bin/
-                        kubectl version --client
+                        # Apply Kustomize resources
+                        kubectl apply -k k8s/overlays/${CHOOSE_ENVIRONMENT}
+                        
+                        # Update deployment image
+                        kubectl set image deployment/petclinic petclinic=${DOCKER_IMAGE}:latest -n ${NAMESPACE}
+                        
+                        # Wait for rollout to complete
+                        kubectl rollout status deployment/petclinic -n ${NAMESPACE} --timeout=300s
                     '''
                 }
             }
         }
-        stage('Test kubectl') {
+        
+        stage('Verify Deployment') {
             steps {
-                container('kubectl') {
-                    sh 'kubectl get nodes'
+                container('limitless') {
+                    sh '''
+                        # Wait for pods to be ready
+                        kubectl wait --for=condition=ready pod -l app=petclinic -n ${NAMESPACE} --timeout=120s
+                        
+                        # Show deployment status
+                        kubectl get pods,services -l app=petclinic -n ${NAMESPACE}
+                    '''
                 }
             }
         }
-        stage('Create resources') {
+        stage('Deploy Infrastructure with Terraform') {
             steps {
-                container('kubectl') {
-                    sh "kubectl apply -k k8s/overlays/${params.CHOOSE_ENVIRONMENT}"
+                container('terraform') {
+                    sh '''
+                        cd terraform/environments/${CHOOSE_ENVIRONMENT}
+                        terraform init
+                        terraform plan -out=tfplan
+                        terraform apply tfplan
+                    '''
                 }
             }
         }
-        stage('Run App and Port Forward') {
-            parallel {
-                stage('Start App') {
-                    steps {
-                        container('maven') {
-                            sh 'mvn spring-boot:run'
-                        }
-                    }
-                }
-                stage('Port Forward') {
-                    steps {
-                        container('kubectl') {
-                            script {
-                                sh 'sleep 30'
+        
+        stage('Health Check') {
+            steps {
+                container('limitless') {
+                    sh '''
+                        POD_NAME=$(kubectl get pods -l app=petclinic -n ${NAMESPACE} -o jsonpath='{.items[0].metadata.name}')
 
-                                def podName = sh(
-                                    script: "kubectl get pods -l app=petclinic -o jsonpath='{.items[0].metadata.name}'",
-                                    returnStdout: true
-                                ).trim()
-
-                                echo "Port forwarding to pod: ${podName}"
-
-                                sh "kubectl port-forward pod/${podName} 8085:8085"
-                            }
-                        }
-                    }
+                        # Wait and test health endpoint
+                        sleep 15
+                        
+                        for i in {1..5}; do
+                            if curl -f http://petclinic-service.svc.cluster.local:30082/actuator/health 2>/dev/null; then
+                                echo "✅ Application health check passed!"
+                                kill $PF_PID 2>/dev/null || true
+                                exit 0
+                            fi
+                            echo "⏳ Health check attempt $i/5..."
+                            sleep 10
+                        done
+                        
+                        kill $PF_PID 2>/dev/null || true
+                        echo "❌ Health check failed"
+                        exit 1
+                    '''
                 }
             }
+        }
+        
+        
+        stage('Deployment Summary') {
+            steps {
+                container('limitless') {
+                    sh '''
+                        echo "=== Deployment Summary ==="
+                        echo "Environment: ${NAMESPACE}"
+                        echo "Image: ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                        echo ""
+                        echo "=== Kubernetes Resources ==="
+                        kubectl get all -l app=petclinic -n ${NAMESPACE}
+                        echo ""
+                        echo "=== Access Information ==="
+                        kubectl get services -n ${NAMESPACE}
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "🎉 Deployment successful! Application is running in ${params.CHOOSE_ENVIRONMENT} environment."
+        }
+        failure {
+            echo "❌ Deployment failed. Check the logs above for details."
         }
     }
 }
