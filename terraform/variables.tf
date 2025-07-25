@@ -50,3 +50,19 @@ variable "db_password" {
   type        = string
   default     = "petclinic"
 } 
+
+variable "kubernetes_host" {
+  description = "Kubernetes API server endpoint"
+  type        = string
+}
+
+variable "kubernetes_token" {
+  description = "Kubernetes service account token"
+  type        = string
+  sensitive   = true
+}
+
+variable "kubernetes_ca_certificate" {
+  description = "Kubernetes cluster CA certificate (base64 encoded)"
+  type        = string
+}

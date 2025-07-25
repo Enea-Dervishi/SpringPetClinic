@@ -8,7 +8,9 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path = "/etc/rancher/k3s/k3s.yaml"
+  host                   = var.kubernetes_host
+  token                  = var.kubernetes_token
+  cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
 }
 
 # Use environment-specific variables

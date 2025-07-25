@@ -31,14 +31,18 @@ variable "argocd_https_node_port" {
   default     = 30443
 }
 
-variable "k8s_config_path" {
-  description = "Path to Kubernetes config file"
+variable "kubernetes_host" {
+  description = "Kubernetes API server endpoint"
   type        = string
-  default     = "~/.kube/config"
 }
 
-variable "k8s_context" {
-  description = "Kubernetes context to use"
+variable "kubernetes_token" {
+  description = "Kubernetes service account token"
   type        = string
-  default     = ""
-} 
+  sensitive   = true
+}
+
+variable "kubernetes_ca_certificate" {
+  description = "Kubernetes cluster CA certificate (base64 encoded)"
+  type        = string
+}

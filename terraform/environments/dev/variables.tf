@@ -23,18 +23,6 @@ variable "mysql_password" {
   default     = "not_used"  # Default value since MySQL is not used
 }
 
-variable "k8s_config_path" {
-  description = "Path to Kubernetes config file"
-  type        = string
-  default     = "~/.kube/config"
-}
-
-variable "k8s_context" {
-  description = "Kubernetes context to use"
-  type        = string
-  default     = ""
-}
-
 variable "build_number" {
   description = "Build number for image tagging"
   type        = string

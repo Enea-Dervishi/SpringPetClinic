@@ -22,11 +22,13 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path    = var.k8s_config_path
-  config_context = var.k8s_context != "" ? var.k8s_context : null
+  host                   = var.kubernetes_host
+  token                  = var.kubernetes_token
+  cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
 }
 
 provider "kubectl" {
-  config_path    = var.k8s_config_path
-  config_context = var.k8s_context != "" ? var.k8s_context : null
-} 
+  host                   = var.kubernetes_host
+  token                  = var.kubernetes_token
+  cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
+}
