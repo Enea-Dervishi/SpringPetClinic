@@ -7,3 +7,6 @@ images:
   - name: arey/springboot-petclinic
     newName: ghcr.io/enea-dervishi/petclinic
     newTag: dev-4 
+
+patchesStrategicMerge:
+  - deployment-patch.yaml

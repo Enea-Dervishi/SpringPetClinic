@@ -22,13 +22,11 @@ terraform {
 }
 
 provider "kubernetes" {
-  host                   = var.kubernetes_host
-  token                  = var.kubernetes_token
-  cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
+  config_path    = "~/.kube/config"
+  config_context = "kind-terraform-k8s-demo"
 }
 
 provider "kubectl" {
-  host                   = var.kubernetes_host
-  token                  = var.kubernetes_token
-  cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
+  config_path    = "~/.kube/config"
+  config_context = "kind-terraform-k8s-demo"
 }

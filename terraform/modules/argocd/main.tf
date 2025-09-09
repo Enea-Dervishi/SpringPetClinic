@@ -19,7 +19,8 @@ resource "kubectl_manifest" "argocd_install" {
     #if length(regexall("(?m)^(kind|apiVersion):", manifest)) > 1
   }
   
-  yaml_body = each.value
+  yaml_body          = each.value
+  override_namespace = "argocd"
   depends_on = [kubernetes_namespace.argocd]
 }
 
