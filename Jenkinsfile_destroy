@@ -1,0 +1,247 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins
+  containers:
+  - name: kubectl
+    image: alpine:3.18
+    command: ["sleep"]
+    args: ["infinity"]
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+  - name: terraform
+    image: hashicorp/terraform:1.5
+    command: ["sleep"]
+    args: ["infinity"]
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+            '''
+        }
+    }
+    
+    parameters {
+        choice(
+            name: 'CHOOSE_ENVIRONMENT',
+            choices: ['dev', 'prod', 'staging'],
+            description: 'Which Environment do you want to destroy?'
+        )
+        booleanParam(
+            name: 'CONFIRM_DESTROY',
+            defaultValue: false,
+            description: 'Are you sure you want to destroy this environment? This action cannot be undone!'
+        )
+        booleanParam(
+            name: 'DESTROY_NAMESPACE',
+            defaultValue: true,
+            description: 'Also delete the entire namespace?'
+        )
+    }
+    
+    environment {
+        NAMESPACE = "${params.CHOOSE_ENVIRONMENT}"
+        ACTUAL_NAMESPACE = "petclinic-${params.CHOOSE_ENVIRONMENT}"
+    }
+    
+    stages {
+        stage('Validation') {
+            steps {
+                script {
+                    if (!params.CONFIRM_DESTROY) {
+                        error("❌ Destroy operation not confirmed. Please check 'CONFIRM_DESTROY' parameter to proceed.")
+                    }
+                    
+                    echo "⚠️  WARNING: This will destroy all resources in the ${params.CHOOSE_ENVIRONMENT} environment!"
+                    echo "⚠️  Proceeding in 10 seconds..."
+                    sleep 10
+                }
+            }
+        }
+        
+        stage('Setup Tools') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        apk add --no-cache curl
+                        curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl"
+                        chmod +x kubectl
+                        mv kubectl /usr/local/bin/
+                        kubectl version --client
+                    '''
+                }
+            }
+        }
+        
+        stage('Check Current Resources') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        echo "=== Current Resources in ${ACTUAL_NAMESPACE} ==="
+                        kubectl get all -n ${ACTUAL_NAMESPACE} || echo "Namespace ${ACTUAL_NAMESPACE} not found or empty"
+                        
+                        echo ""
+                        echo "=== Terraform State Check ==="
+                        if [ -d "terraform/environments/${CHOOSE_ENVIRONMENT}" ]; then
+                            echo "Terraform directory found for ${CHOOSE_ENVIRONMENT}"
+                        else
+                            echo "No terraform directory found for ${CHOOSE_ENVIRONMENT}"
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Destroy Terraform Infrastructure') {
+            steps {
+                container('terraform') {
+                    script {
+                        try {
+                            sh '''
+                                cd terraform/environments/${CHOOSE_ENVIRONMENT}
+                                
+                                if [ -f "terraform.tfstate" ] || [ -f ".terraform/terraform.tfstate" ]; then
+                                    echo "=== Terraform state found, proceeding with destroy ==="
+                                    terraform init
+                                    terraform destroy -auto-approve
+                                    echo "✅ Terraform infrastructure destroyed successfully"
+                                else
+                                    echo "ℹ️  No terraform state found, skipping terraform destroy"
+                                fi
+                            '''
+                        } catch (Exception e) {
+                            echo "⚠️  Terraform destroy failed or partially completed: ${e.getMessage()}"
+                            echo "Continuing with Kubernetes resource cleanup..."
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Destroy Kubernetes Resources') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        if kubectl get namespace ${ACTUAL_NAMESPACE} >/dev/null 2>&1; then
+                            echo "=== Destroying Kubernetes resources ==="
+                            
+                            # Delete application resources using Kustomize if available
+                            if [ -d "k8s/overlays/${CHOOSE_ENVIRONMENT}" ]; then
+                                echo "Deleting resources via Kustomize..."
+                                kubectl delete -k k8s/overlays/${CHOOSE_ENVIRONMENT} --ignore-not-found=true || true
+                            fi
+                            
+                            # Delete petclinic resources specifically
+                            echo "Deleting petclinic resources..."
+                            kubectl delete all -l app=petclinic -n ${ACTUAL_NAMESPACE} --ignore-not-found=true || true
+                            kubectl delete configmaps -l app=petclinic -n ${ACTUAL_NAMESPACE} --ignore-not-found=true || true
+                            kubectl delete secrets -l app=petclinic -n ${ACTUAL_NAMESPACE} --ignore-not-found=true || true
+                            kubectl delete pvc -l app=petclinic -n ${ACTUAL_NAMESPACE} --ignore-not-found=true || true
+                            kubectl delete ingress -l app=petclinic -n ${ACTUAL_NAMESPACE} --ignore-not-found=true || true
+                            
+                            # Wait for resources to be deleted
+                            echo "Waiting for resources to be fully deleted..."
+                            kubectl wait --for=delete pods -l app=petclinic -n ${ACTUAL_NAMESPACE} --timeout=120s || true
+                            
+                            echo "✅ Application resources destroyed"
+                        else
+                            echo "ℹ️  Namespace ${ACTUAL_NAMESPACE} not found, skipping resource cleanup"
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Delete Namespace') {
+            when {
+                expression { params.DESTROY_NAMESPACE }
+            }
+            steps {
+                container('kubectl') {
+                    sh '''
+                        if kubectl get namespace ${ACTUAL_NAMESPACE} >/dev/null 2>&1; then
+                            echo "=== Deleting namespace ${ACTUAL_NAMESPACE} ==="
+                            kubectl delete namespace ${ACTUAL_NAMESPACE} --timeout=300s
+                            echo "✅ Namespace ${ACTUAL_NAMESPACE} deleted"
+                        else
+                            echo "ℹ️  Namespace ${ACTUAL_NAMESPACE} not found"
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Cleanup Verification') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        echo "=== Cleanup Verification ==="
+                        
+                        # Check for any remaining petclinic resources
+                        REMAINING_RESOURCES=$(kubectl get all -l app=petclinic --all-namespaces 2>/dev/null || echo "")
+                        
+                        if [ -z "$REMAINING_RESOURCES" ]; then
+                            echo "✅ No petclinic resources found - cleanup successful"
+                        else
+                            echo "⚠️  Some resources may still exist:"
+                            echo "$REMAINING_RESOURCES"
+                        fi
+                        
+                        # Check namespace status
+                        if [ "${DESTROY_NAMESPACE}" = "true" ]; then
+                            if kubectl get namespace ${ACTUAL_NAMESPACE} >/dev/null 2>&1; then
+                                echo "⚠️  Namespace ${ACTUAL_NAMESPACE} still exists"
+                            else
+                                echo "✅ Namespace ${ACTUAL_NAMESPACE} successfully deleted"
+                            fi
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Destruction Summary') {
+            steps {
+                script {
+                    echo """
+=== Destruction Summary ===
+Environment: ${params.CHOOSE_ENVIRONMENT}
+Terraform Infrastructure: Destroyed
+Kubernetes Resources: Destroyed
+Namespace Deletion: ${params.DESTROY_NAMESPACE ? 'Yes' : 'No'}
+
+The ${params.CHOOSE_ENVIRONMENT} environment has been destroyed.
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "🎉 Environment ${params.CHOOSE_ENVIRONMENT} successfully destroyed!"
+        }
+        failure {
+            echo "❌ Destruction failed or incomplete. Some resources may still exist. Please check manually."
+        }
+        always {
+            script {
+                if (params.CHOOSE_ENVIRONMENT == 'prod') {
+                    echo "⚠️  PRODUCTION ENVIRONMENT DESTRUCTION COMPLETED ⚠️"
+                }
+            }
+        }
+    }
+}

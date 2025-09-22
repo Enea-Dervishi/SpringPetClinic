@@ -3,10 +3,10 @@ module "petclinic" {
 
   namespace        = "petclinic-staging"
   replicas         = 2
-  image_repository = "springcommunity/spring-petclinic"
-  image_tag        = "latest"
-  container_port   = 8081
-  service_port     = 8081
+  image_repository = "ghcr.io/enea-dervishi/petclinic"
+  image_tag        = "staging-5"
+  container_port   = 8085
+  service_port     = 8085
   node_port        = 30082
   
   # Resource limits for staging environment

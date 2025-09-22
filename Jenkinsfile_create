@@ -8,7 +8,7 @@ kind: Pod
 spec:
   serviceAccountName: jenkins
   containers:
-  - name: limitless 
+  - name: limitless
     image: factorysrl/limitlessdx-cli:0.0.8.1
     command: ["sleep"]
     args: ["infinity"]
@@ -33,7 +33,7 @@ spec:
             '''
         }
     }
-    
+
     parameters {
         choice(
             name: 'CHOOSE_ENVIRONMENT',
@@ -46,46 +46,71 @@ spec:
             description: 'Which Docker image version to deploy?'
         )
     }
-    
+
     environment {
-        DOCKER_IMAGE = "ghcr.io/enea-dervishi/petclinic"
+        DOCKER_IMAGE = 'ghcr.io/enea-dervishi/petclinic'
         NAMESPACE = "petclinic-${params.CHOOSE_ENVIRONMENT}"
+        GITHUB_TOKEN = credentials('github-token')
     }
-    
+
     stages {
-        
         stage('Create Namespace') {
             steps {
                 container('limitless') {
-                    sh "kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -"
+
+                    sh """
+                    kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                
+                    # Delete existing secret if it exists (to update credentials)
+                    kubectl delete secret ghcr-secret -n ${NAMESPACE} --ignore-not-found=true
+                    
+                    # Create image pull secret for GitHub Container Registry
+                    # You'll need to add GITHUB_TOKEN as a Jenkins credential
+                    kubectl create secret docker-registry ghcr-secret \
+                        --docker-server=ghcr.io \
+                        --docker-username=enea-dervishi \
+                        --docker-password=${GITHUB_TOKEN} \
+                        --docker-email=eneadervishi14@gmail.com \
+                        -n ${NAMESPACE}
+                        
+                    # Verify secret was created
+                    kubectl get secret ghcr-secret -n ${NAMESPACE}
+                    """
                 }
             }
         }
-        
+
         stage('Deploy Application') {
             steps {
                 container('limitless') {
                     sh '''
-                        # Apply Kustomize resources
+                        echo "Deploying application with Kustomize..."
+                        
+                        # Apply Kustomize resources (this will include the imagePullSecrets patch)
                         kubectl apply -k k8s/overlays/${CHOOSE_ENVIRONMENT}
                         
-                        # Update deployment image
-                        kubectl set image deployment/petclinic petclinic=${DOCKER_IMAGE}:latest -n ${NAMESPACE}
+                        # If you want to override the tag from the parameter, update the image
+                        if [ "${IMAGE_TAG}" != "dev-4" ]; then
+                            echo "Updating image tag to ${IMAGE_TAG}..."
+                            kubectl set image deployment/petclinic petclinic=${DOCKER_IMAGE}:${IMAGE_TAG} -n ${NAMESPACE}
+                        fi
                         
-                        # Wait for rollout to complete
+                        echo "Waiting for deployment to complete..."
                         kubectl rollout status deployment/petclinic -n ${NAMESPACE} --timeout=300s
+                        
+                        echo "✅ Deployment completed successfully"
                     '''
                 }
             }
         }
-        
+
         stage('Verify Deployment') {
             steps {
                 container('limitless') {
                     sh '''
                         # Wait for pods to be ready
                         kubectl wait --for=condition=ready pod -l app=petclinic -n ${NAMESPACE} --timeout=120s
-                        
+
                         # Show deployment status
                         kubectl get pods,services -l app=petclinic -n ${NAMESPACE}
                     '''
@@ -104,7 +129,7 @@ spec:
                 }
             }
         }
-        
+
         stage('Health Check') {
             steps {
                 container('limitless') {
@@ -113,26 +138,22 @@ spec:
 
                         # Wait and test health endpoint
                         sleep 15
-                        
+
                         for i in {1..5}; do
-                            if curl -f http://petclinic-service.svc.cluster.local:30082/actuator/health 2>/dev/null; then
+                            if curl -f http://petclinic-service.${NAMESPACE}.svc.cluster.local:8085/manage/health 2>/dev/null; then
                                 echo "✅ Application health check passed!"
-                                kill $PF_PID 2>/dev/null || true
                                 exit 0
                             fi
                             echo "⏳ Health check attempt $i/5..."
                             sleep 10
                         done
-                        
-                        kill $PF_PID 2>/dev/null || true
                         echo "❌ Health check failed"
                         exit 1
                     '''
                 }
             }
         }
-        
-        
+
         stage('Deployment Summary') {
             steps {
                 container('limitless') {
@@ -151,13 +172,13 @@ spec:
             }
         }
     }
-    
+
     post {
         success {
             echo "🎉 Deployment successful! Application is running in ${params.CHOOSE_ENVIRONMENT} environment."
         }
         failure {
-            echo "❌ Deployment failed. Check the logs above for details."
+            echo '❌ Deployment failed. Check the logs above for details.'
         }
     }
 }
