@@ -1,7 +1,7 @@
 // Pipeline configuration for SpringPetClinic using shared JTE terraform library
 libraries {
-    git
     kubernetes
+    scm
     terraform {
         project_name = "petclinic"
         version = "1.5"
