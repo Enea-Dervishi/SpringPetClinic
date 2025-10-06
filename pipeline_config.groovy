@@ -8,7 +8,7 @@ libraries {
         container_name = "terraform"
         auto_approve = false
         environment = "dev"
-        allowed_environments = "dev, staging, prod"
+        allowed_environments = "dev"
         directory_pattern = "environments/\${environment}"
     }
 }
