@@ -1,4 +1,4 @@
 agent{
     checkoutSCM()
-    deploy_complete()
+    deploy_complete(environment: "dev", project_name: "petclinic")
 }
