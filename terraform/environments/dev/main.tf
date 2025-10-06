@@ -7,10 +7,10 @@ module "argocd" {
   git_branch    = "main"
   app_namespace = "petclinic-dev"
 
-  kubernetes_host            = var.kubernetes_host
-  kubernetes_token           = var.kubernetes_token
-  kubernetes_ca_certificate  = var.kubernetes_ca_certificate
-  
+  kubernetes_host           = var.kubernetes_host
+  kubernetes_token          = var.kubernetes_token
+  kubernetes_ca_certificate = var.kubernetes_ca_certificate
+
   argocd_node_port       = 30080
   argocd_https_node_port = 30443
 }
