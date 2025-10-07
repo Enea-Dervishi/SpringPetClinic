@@ -1,56 +1,54 @@
 # ArgoCD Installation and Configuration Module
 
-# Try to get existing ArgoCD namespace
-data "kubernetes_namespace" "argocd_existing" {
-  metadata {
-    name = "argocd"
-  }
-}
-
-# Create ArgoCD namespace only if it doesn't exist
-resource "kubernetes_namespace" "argocd" {
-  count = try(data.kubernetes_namespace.argocd_existing.metadata[0].name, null) == null ? 1 : 0
-  
-  metadata {
-    name = "argocd"
-  }
-  
-  lifecycle {
-    ignore_changes = [metadata[0].annotations, metadata[0].labels]
-  }
-}
-
-# Local value to reference the namespace regardless of how it was obtained
-locals {
-  argocd_namespace_name = try(
-    data.kubernetes_namespace.argocd_existing.metadata[0].name,
-    kubernetes_namespace.argocd[0].metadata[0].name,
-    "argocd"
-  )
-}
-
 # Install ArgoCD using the official manifests
 data "http" "argocd_install" {
   url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
 }
 
-# Split the multi-document YAML and apply each resource
+# Split the multi-document YAML
 locals {
-  argocd_manifests = [
-    for doc in split("---", data.http.argocd_install.response_body) : 
+  argocd_manifests_raw = split("---", data.http.argocd_install.response_body)
+  
+  # Filter and categorize manifests
+  argocd_manifests_filtered = [
+    for doc in local.argocd_manifests_raw : 
     doc if length(regexall("(?m)^(apiVersion|kind):", doc)) > 0
+  ]
+  
+  # Separate namespace from other resources
+  namespace_manifest = [
+    for doc in local.argocd_manifests_filtered :
+    doc if length(regexall("(?m)^kind:\\s*Namespace", doc)) > 0
+  ]
+  
+  other_manifests = [
+    for doc in local.argocd_manifests_filtered :
+    doc if length(regexall("(?m)^kind:\\s*Namespace", doc)) == 0
   ]
 }
 
-# Apply each ArgoCD manifest separately
+# Create namespace first
+resource "kubectl_manifest" "argocd_namespace" {
+  count = length(local.namespace_manifest) > 0 ? 1 : 0
+  
+  yaml_body = local.namespace_manifest[0]
+  wait      = true
+}
+
+# Then create all other resources
 resource "kubectl_manifest" "argocd_install" {
-  for_each = { for idx, doc in local.argocd_manifests : idx => doc }
+  for_each = { for idx, doc in local.other_manifests : idx => doc }
   
   yaml_body          = each.value
-  override_namespace = local.argocd_namespace_name
+  override_namespace = "argocd"
   wait               = true
   
-  depends_on = [kubernetes_namespace.argocd]
+  depends_on = [kubectl_manifest.argocd_namespace]
+}
+
+# Local value for namespace name
+locals {
+  argocd_namespace_name = "argocd"
 }
 
 # Wait for ArgoCD to fully initialize
