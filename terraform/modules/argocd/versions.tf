@@ -25,10 +25,12 @@ provider "kubernetes" {
   host                   = var.kubernetes_host
   token                  = var.kubernetes_token
   cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
+  insecure               = true
 }
 
 provider "kubectl" {
   host                   = var.kubernetes_host
   token                  = var.kubernetes_token
   cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
+  insecure               = true
 }
