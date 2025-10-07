@@ -1,5 +1,21 @@
 # ArgoCD Installation and Configuration Module
 
+# Create ArgoCD namespace explicitly
+resource "kubernetes_namespace" "argocd" {
+  metadata {
+    name = "argocd"
+  }
+  
+  lifecycle {
+    ignore_changes = [metadata[0].annotations, metadata[0].labels]
+  }
+}
+
+# Local value for namespace name
+locals {
+  argocd_namespace_name = kubernetes_namespace.argocd.metadata[0].name
+}
+
 # Install ArgoCD using the official manifests
 data "http" "argocd_install" {
   url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
@@ -7,55 +23,56 @@ data "http" "argocd_install" {
 
 # Split the multi-document YAML
 locals {
-  argocd_manifests_raw = split("---", data.http.argocd_install.response_body)
-  
-  # Filter and categorize manifests
-  argocd_manifests_filtered = [
-    for doc in local.argocd_manifests_raw : 
-    doc if length(regexall("(?m)^(apiVersion|kind):", doc)) > 0
-  ]
-  
-  # Separate namespace from other resources
-  namespace_manifest = [
-    for doc in local.argocd_manifests_filtered :
-    doc if length(regexall("(?m)^kind:\\s*Namespace", doc)) > 0
-  ]
-  
-  other_manifests = [
-    for doc in local.argocd_manifests_filtered :
-    doc if length(regexall("(?m)^kind:\\s*Namespace", doc)) == 0
+  argocd_manifests = [
+    for doc in split("---", data.http.argocd_install.response_body) : 
+    trimspace(doc) if length(regexall("(?m)^(apiVersion|kind):", doc)) > 0 && length(regexall("(?m)^kind:\\s*Namespace", doc)) == 0
   ]
 }
 
-# Create namespace first
-resource "kubectl_manifest" "argocd_namespace" {
-  count = length(local.namespace_manifest) > 0 ? 1 : 0
-  
-  yaml_body = local.namespace_manifest[0]
-  wait      = true
-}
-
-# Then create all other resources
+# Apply all ArgoCD manifests (excluding any Namespace definitions)
 resource "kubectl_manifest" "argocd_install" {
-  for_each = { for idx, doc in local.other_manifests : idx => doc }
+  for_each = { for idx, doc in local.argocd_manifests : idx => doc }
   
   yaml_body          = each.value
-  override_namespace = "argocd"
-  wait               = true
+  override_namespace = local.argocd_namespace_name
+  wait               = false  # Don't wait for each individual resource
   
-  depends_on = [kubectl_manifest.argocd_namespace]
+  depends_on = [kubernetes_namespace.argocd]
 }
 
-# Local value for namespace name
-locals {
-  argocd_namespace_name = "argocd"
+# Wait for ArgoCD server deployment to be ready
+resource "kubernetes_manifest" "wait_for_argocd_server" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "ConfigMap"
+    metadata = {
+      name      = "argocd-wait-marker"
+      namespace = local.argocd_namespace_name
+    }
+    data = {
+      status = "waiting"
+    }
+  }
+  
+  wait {
+    condition {
+      type   = "Ready"
+      status = "True"
+    }
+  }
+  
+  depends_on = [kubectl_manifest.argocd_install]
+  
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 # Wait for ArgoCD to fully initialize
 resource "time_sleep" "wait_for_argocd" {
   depends_on = [kubectl_manifest.argocd_install]
   
-  create_duration = "60s"
+  create_duration = "90s"
 }
 
 # Create ArgoCD Application for PetClinic
