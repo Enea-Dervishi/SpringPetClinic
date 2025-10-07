@@ -6,10 +6,10 @@ data "kubernetes_namespace" "argocd" {
     name = "argocd"
   }
   
-  lifecycle {
+/*   lifecycle {
     ignore_changes = [metadata[0].annotations, metadata[0].labels]
     prevent_destroy = true
-  }
+  } */
 }
 
 # Install ArgoCD using the official manifests
