@@ -20,6 +20,15 @@ resource "kubernetes_namespace" "argocd" {
   }
 }
 
+# Local value to reference the namespace regardless of how it was obtained
+locals {
+  argocd_namespace_name = try(
+    data.kubernetes_namespace.argocd_existing.metadata[0].name,
+    kubernetes_namespace.argocd[0].metadata[0].name,
+    "argocd"
+  )
+}
+
 # Install ArgoCD using the official manifests
 data "http" "argocd_install" {
   url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
@@ -28,27 +37,28 @@ data "http" "argocd_install" {
 # Apply ArgoCD manifests
 resource "kubectl_manifest" "argocd_install" {
   yaml_body          = data.http.argocd_install.response_body
-  override_namespace = "argocd"
+  override_namespace = local.argocd_namespace_name
   wait               = true
   wait_for_rollout   = true
   
   depends_on = [kubernetes_namespace.argocd]
 }
 
-# Wait a bit for ArgoCD to fully initialize
+# Wait for ArgoCD to fully initialize
 resource "time_sleep" "wait_for_argocd" {
   depends_on = [kubectl_manifest.argocd_install]
   
   create_duration = "30s"
 }
 
+# Create ArgoCD Application for PetClinic
 resource "kubectl_manifest" "petclinic_application" {
   yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
       name      = "petclinic-${var.environment}"
-      namespace = "argocd"
+      namespace = local.argocd_namespace_name
     }
     spec = {
       project = "default"
@@ -76,10 +86,11 @@ resource "kubectl_manifest" "petclinic_application" {
   depends_on = [time_sleep.wait_for_argocd]
 }
 
+# Create NodePort service to access ArgoCD UI
 resource "kubernetes_service" "argocd_server_nodeport" {
   metadata {
     name      = "argocd-server-nodeport"
-    namespace = "argocd"
+    namespace = local.argocd_namespace_name
   }
 
   spec {
@@ -88,6 +99,7 @@ resource "kubernetes_service" "argocd_server_nodeport" {
     port {
       port        = 80
       target_port = 8080
+      node_port   = var.argocd_node_port
       protocol    = "TCP"
       name        = "http"
     }
@@ -95,6 +107,7 @@ resource "kubernetes_service" "argocd_server_nodeport" {
     port {
       port        = 443
       target_port = 8080
+      node_port   = var.argocd_https_node_port
       protocol    = "TCP"
       name        = "https"
     }
