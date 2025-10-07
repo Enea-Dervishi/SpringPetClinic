@@ -4,7 +4,7 @@ output "argocd_namespace" {
 }
 
 output "argocd_ui_url" {
-  description = "ArgoCD UI URL"  
+  description = "ArgoCD UI URL"
   value       = module.argocd.argocd_ui_url
 }
 
