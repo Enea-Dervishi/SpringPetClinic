@@ -1,9 +1,13 @@
 # ArgoCD Installation and Configuration Module
 
-# Create ArgoCD namespace
+# Create ArgoCD namespace (or use existing)
 resource "kubernetes_namespace" "argocd" {
   metadata {
     name = "argocd"
+  }
+  
+  lifecycle {
+    ignore_changes = [metadata[0].annotations, metadata[0].labels]
   }
 }
 

@@ -1,19 +1,20 @@
-# Install ArgoCD
-module "argocd" {
-  source = "../../modules/argocd"
-
-  environment   = "dev"
-  git_repo_url  = "https://github.com/enea-dervishi/SpringPetClinic.git"
-  git_branch    = "main"
-  app_namespace = "petclinic-dev"
-
-  kubernetes_host           = var.kubernetes_host
-  kubernetes_token          = var.kubernetes_token
-  kubernetes_ca_certificate = var.kubernetes_ca_certificate
-
-  argocd_node_port       = 30080
-  argocd_https_node_port = 30443
-}
+# ArgoCD is already installed manually and working
+# Commenting out to avoid conflicts during terraform apply
+# module "argocd" {
+#   source = "../../modules/argocd"
+#
+#   environment   = "dev"
+#   git_repo_url  = "https://github.com/enea-dervishi/SpringPetClinic.git"
+#   git_branch    = "main"
+#   app_namespace = "petclinic-dev"
+#
+#   kubernetes_host           = var.kubernetes_host
+#   kubernetes_token          = var.kubernetes_token
+#   kubernetes_ca_certificate = var.kubernetes_ca_certificate
+#
+#   argocd_node_port       = 30080
+#   argocd_https_node_port = 30443
+# }
 
 # Legacy direct deployment (can be removed once GitOps is working)
 # module "petclinic" {
