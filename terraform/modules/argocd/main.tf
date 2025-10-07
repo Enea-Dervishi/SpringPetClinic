@@ -1,15 +1,29 @@
 # ArgoCD Installation and Configuration Module
 
-# Use existing ArgoCD namespace or create if not exists
-data "kubernetes_namespace" "argocd" {
+# Try to get existing ArgoCD namespace
+data "kubernetes_namespace" "argocd_existing" {
+  metadata {
+    name = "argocd"
+  }
+}
+
+# Create ArgoCD namespace only if it doesn't exist
+resource "kubernetes_namespace" "argocd" {
+  count = try(data.kubernetes_namespace.argocd_existing.metadata[0].name, null) == null ? 1 : 0
+  
   metadata {
     name = "argocd"
   }
   
-/*   lifecycle {
+  lifecycle {
     ignore_changes = [metadata[0].annotations, metadata[0].labels]
     prevent_destroy = true
-  } */
+  }
+}
+
+# Local value to reference the namespace regardless of how it was obtained
+locals {
+  argocd_namespace_name = try(data.kubernetes_namespace.argocd_existing.metadata[0].name, kubernetes_namespace.argocd[0].metadata[0].name)
 }
 
 # Install ArgoCD using the official manifests
@@ -21,7 +35,7 @@ data "http" "argocd_install" {
 resource "kubectl_manifest" "argocd_install" {
   yaml_body = data.http.argocd_install.response_body
   override_namespace = "argocd"
-  depends_on = [kubernetes_namespace.argocd]
+  depends_on = [data.kubernetes_namespace.argocd_existing, kubernetes_namespace.argocd]
 }
 
 # Wait for ArgoCD server to be ready
