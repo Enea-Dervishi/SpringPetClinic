@@ -22,14 +22,14 @@ terraform {
 }
 
 provider "kubernetes" {
-  host     = var.kubernetes_host
-  token    = var.kubernetes_token
-  insecure = true
+  host                   = "https://kubernetes.default.svc"
+  token                  = file("/var/run/secrets/kubernetes.io/serviceaccount/token")
+  cluster_ca_certificate = file("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 }
 
 provider "kubectl" {
-  host                   = var.kubernetes_host
-  token                  = var.kubernetes_token
-  cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
-  insecure               = true
+  host                   = "https://kubernetes.default.svc"
+  token                  = file("/var/run/secrets/kubernetes.io/serviceaccount/token")
+  cluster_ca_certificate = file("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+  load_config_file       = false
 }

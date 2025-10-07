@@ -1,22 +1,5 @@
 # ArgoCD Installation and Configuration Module
 
-terraform {
-  required_providers {
-    kubectl = {
-      source  = "gavinbunney/kubectl"
-      version = ">= 1.14.0"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = ">= 2.0.0"
-    }
-    http = {
-      source  = "hashicorp/http"
-      version = ">= 3.0.0"
-    }
-  }
-}
-
 # Try to get existing ArgoCD namespace
 data "kubernetes_namespace" "argocd_existing" {
   metadata {
