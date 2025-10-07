@@ -8,8 +8,9 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path    = "~/.kube/config"
-  config_context = "kind-terraform-k8s-demo"
+  host                   = var.kubernetes_host
+  token                  = var.kubernetes_token
+  cluster_ca_certificate = base64decode(var.kubernetes_ca_certificate)
 }
 
 # Use environment-specific variables
