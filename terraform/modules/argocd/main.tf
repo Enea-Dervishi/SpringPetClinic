@@ -34,12 +34,21 @@ data "http" "argocd_install" {
   url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
 }
 
-# Apply ArgoCD manifests
+# Split the multi-document YAML and apply each resource
+locals {
+  argocd_manifests = [
+    for doc in split("---", data.http.argocd_install.response_body) : 
+    doc if length(regexall("(?m)^(apiVersion|kind):", doc)) > 0
+  ]
+}
+
+# Apply each ArgoCD manifest separately
 resource "kubectl_manifest" "argocd_install" {
-  yaml_body          = data.http.argocd_install.response_body
+  for_each = { for idx, doc in local.argocd_manifests : idx => doc }
+  
+  yaml_body          = each.value
   override_namespace = local.argocd_namespace_name
   wait               = true
-  wait_for_rollout   = true
   
   depends_on = [kubernetes_namespace.argocd]
 }
@@ -48,7 +57,7 @@ resource "kubectl_manifest" "argocd_install" {
 resource "time_sleep" "wait_for_argocd" {
   depends_on = [kubectl_manifest.argocd_install]
   
-  create_duration = "30s"
+  create_duration = "60s"
 }
 
 # Create ArgoCD Application for PetClinic

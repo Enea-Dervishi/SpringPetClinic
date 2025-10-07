@@ -6,7 +6,7 @@ libraries {
         project_name = "petclinic"
         version = "1.5"
         container_name = "terraform"
-        auto_approve = false
+        auto_approve = true
         environment = "dev"
         allowed_environments = "dev"
         directory_pattern = "environments/\${environment}"
