@@ -35,37 +35,9 @@ resource "kubectl_manifest" "argocd_install" {
   
   yaml_body          = each.value
   override_namespace = local.argocd_namespace_name
-  wait               = false  # Don't wait for each individual resource
+  wait               = false
   
   depends_on = [kubernetes_namespace.argocd]
-}
-
-# Wait for ArgoCD server deployment to be ready
-resource "kubernetes_manifest" "wait_for_argocd_server" {
-  manifest = {
-    apiVersion = "v1"
-    kind       = "ConfigMap"
-    metadata = {
-      name      = "argocd-wait-marker"
-      namespace = local.argocd_namespace_name
-    }
-    data = {
-      status = "waiting"
-    }
-  }
-  
-  wait {
-    condition {
-      type   = "Ready"
-      status = "True"
-    }
-  }
-  
-  depends_on = [kubectl_manifest.argocd_install]
-  
-  lifecycle {
-    ignore_changes = all
-  }
 }
 
 # Wait for ArgoCD to fully initialize
