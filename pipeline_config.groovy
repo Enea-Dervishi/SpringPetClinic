@@ -5,7 +5,7 @@ libraries {
     kubectl {
         image = 'bitnami/kubectl:1.30-debian-12'
             createNamespace {
-            command: 'create',
+            command: ['create'],
             type: 'namespace',
             name: 'petclinic-dev',
             flags: '--dry-run=client -o yaml | kubectl apply -f -'
