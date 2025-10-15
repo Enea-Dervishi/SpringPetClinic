@@ -7,7 +7,7 @@ libraries {
             command = 'create'
             type = 'namespace'
             name = 'petclinic-dev'
-            flags = '--dry-run=client -o yaml | kubectl apply -f -'
+            flags = '--save-config'
         }
         applyOverlay {      
             command = 'apply'
