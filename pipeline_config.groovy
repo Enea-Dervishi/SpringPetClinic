@@ -1,21 +1,20 @@
-// Pipeline configuration for SpringPetClinic using shared JTE terraform library
 libraries {
     kubernetes
     git
     kubectl {
-        image = 'bitnami/kubectl=1.30-debian-12'
-            createNamespace {
-            command = ['create']
+        image = 'bitnami/kubectl:1.30-debian-12'
+        createNamespace {
+            command = 'create'
             type = 'namespace'
             name = 'petclinic-dev'
             flags = '--dry-run=client -o yaml | kubectl apply -f -'
-            }
-            applyOverlay {
+        }
+        applyOverlay {      
             command = 'apply'
             type = ''
             name = ''
             flags = '-k k8s/overlays/dev'
-            }
+        }
     }
     terraform {
         project_name = "petclinic"
@@ -32,7 +31,7 @@ application_environments {
     dev {
         terraform_workspace = "dev"
         working_directory = "terraform"
-        auto_approve = true  // Allow auto-approve for dev
+        auto_approve = true
     }
     staging {
         terraform_workspace = "staging"
@@ -42,6 +41,6 @@ application_environments {
     prod {
         terraform_workspace = "prod"
         working_directory = "terraform"
-        auto_approve = false  // Always require manual approval for prod
+        auto_approve = false
     }
 }
