@@ -2,7 +2,7 @@ libraries {
     kubernetes
     git
     kubectl {
-        containerImage = 'bitnami/kubectl:1.30-debian-12'
+        containerImage = 'bitnami/kubectl:latest'
         createNamespace {
             command = 'create'
             type = 'namespace'
