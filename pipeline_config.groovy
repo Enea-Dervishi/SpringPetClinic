@@ -2,7 +2,7 @@ libraries {
     kubernetes
     git
     kubectl {
-        containerImage = 'bitnami/kubectl:latest'
+        containerImage = 'alpine/k8s:1.30.0'
         createNamespace {
             command = 'create'
             type = 'namespace'
