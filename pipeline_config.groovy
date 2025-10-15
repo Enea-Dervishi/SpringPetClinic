@@ -3,18 +3,18 @@ libraries {
     kubernetes
     git
     kubectl {
-        image = 'bitnami/kubectl:1.30-debian-12'
+        image = 'bitnami/kubectl=1.30-debian-12'
             createNamespace {
-            command: ['create'],
-            type: 'namespace',
-            name: 'petclinic-dev',
-            flags: '--dry-run=client -o yaml | kubectl apply -f -'
+            command = ['create'],
+            type = 'namespace',
+            name = 'petclinic-dev',
+            flags = '--dry-run=client -o yaml | kubectl apply -f -'
             }
-            applyOverlay {      
-            command: 'apply',
-            type: '',
-            name: '',
-            flags: '-k k8s/overlays/dev'
+            applyOverlay {
+            command = 'apply',
+            type = '',
+            name = '',
+            flags = '-k k8s/overlays/dev'
             }
     }
     terraform {
