@@ -3,8 +3,8 @@ libraries {
     git
     dxclient {
         hostname = 'mock-dx-server.dxclient-test.svc.cluster.local'
-        dxUsername = credentials('dx-test-username')
-        dxPassword = credentials('dx-test-password')
+        dxUsername = 'dx-test-username'
+        dxPassword = 'dx-test-password'
         dxProtocol = 'http'
         dxPort = '9080'
     }
