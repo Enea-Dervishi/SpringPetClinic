@@ -7,5 +7,6 @@ libraries {
         dxPassword = 'dx-test-password'
         dxProtocol = 'http'
         dxPort = '9080'
+        containerImage = 'factorysrl/limitlessdx-cli:0.0.8.1'
     }
 }
