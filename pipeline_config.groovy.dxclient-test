@@ -9,5 +9,6 @@ libraries {
         dxPort = '9080'
         containerImage = 'factorysrl/limitlessdx-cli:0.0.8.1'
         dxclientPath = '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient'
+        disablePrompt = 'true'
     }
 }
