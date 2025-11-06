@@ -1,6 +1,4 @@
 // DXClient Library Integration Test Pipeline
-@Library('jenkins-shared-lib') _
-
 pipeline {
     agent {
         kubernetes {
@@ -8,9 +6,10 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
+  serviceAccountName: default
   containers:
-  - name: dxclient
-    image: hclcr.io/dx-public/dxclient:v95_CF223_20240925-1911
+  - name: limitless
+    image: factorysrl/limitlessdx-cli:0.0.8.1
     command:
     - cat
     tty: true
@@ -35,10 +34,10 @@ spec:
         
         stage('Test Mock Server') {
             steps {
-                container('kubectl') {
-                    script {
-                        echo "🌐 Testing mock DX server connectivity..."
-                        
+                script {
+                    echo "🌐 Testing mock DX server connectivity..."
+                    
+                    container('kubectl') {
                         // Verify mock server is running
                         sh "kubectl get pods -n dxclient-test"
                         sh "kubectl get svc -n dxclient-test"
@@ -48,16 +47,16 @@ spec:
                             kubectl run test-conn --rm -i --restart=Never --image=curlimages/curl -- \\
                             curl -s 'http://mock-dx-server.dxclient-test.svc.cluster.local:9080/wps' || true
                         """
-                        
-                        echo "✅ Mock server connectivity test completed"
                     }
+                    
+                    echo "✅ Mock server connectivity test completed"
                 }
             }
         }
         
         stage('Test DXClient Container') {
             steps {
-                container('dxclient') {
+                container('limitless') {
                     script {
                         echo "🐳 Testing DXClient container..."
                         
@@ -118,7 +117,7 @@ spec:
                         echo "Password loaded: [MASKED]"
                         
                         // Simulate credential usage in DXClient command
-                        container('dxclient') {
+                        container('limitless') {
                             sh """
                                 echo "Testing credential injection..."
                                 echo "Username: ${DX_USERNAME}"
@@ -135,7 +134,7 @@ spec:
         
         stage('Test Network Connectivity') {
             steps {
-                container('dxclient') {
+                container('limitless') {
                     script {
                         echo "🌐 Testing network connectivity from DXClient container..."
                         
@@ -154,7 +153,7 @@ spec:
         
         stage('Simulate DXClient Commands') {
             steps {
-                container('dxclient') {
+                container('limitless') {
                     script {
                         echo "⚡ Simulating different DXClient commands..."
                         
