@@ -7,6 +7,7 @@ agent {
         dxPassword: 'dx-test-password', 
         dxProtocol: 'http', 
         dxPort: '9080', 
+        dxclientPath: '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient',
         xmlFile: '/tmp/test-config.xml')
       
       deploy_application(
@@ -15,6 +16,7 @@ agent {
         dxPassword: 'dx-test-password', 
         dxProtocol: 'http', 
         dxPort: '9080', 
+        dxclientPath: '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient',
         applicationFile: '/tmp/test.ear', 
         applicationName: 'TestApp')
       
@@ -24,6 +26,7 @@ agent {
         dxPassword: 'dx-test-password', 
         dxProtocol: 'http', 
         dxPort: '9080', 
+        dxclientPath: '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient',
         themeName: 'TestTheme', 
         themePath: '/tmp/themes/TestTheme')
   }
