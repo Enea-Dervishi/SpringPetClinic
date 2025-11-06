@@ -1,6 +1,29 @@
 agent {
       checkoutSCM()
-      xmlaccess(xmlFile: '/tmp/test-config.xml')
-      deploy_application(applicationFile: '/tmp/test.ear', applicationName: 'TestApp')
-      deploy_theme(themeName: 'TestTheme', themePath: '/tmp/themes/TestTheme')
+      
+      xmlaccess(
+        hostname: 'mock-dx-server.dxclient-test.svc.cluster.local', 
+        dxUsername: 'dx-test-username', 
+        dxPassword: 'dx-test-password', 
+        dxProtocol: 'http', 
+        dxPort: '9080', 
+        xmlFile: '/tmp/test-config.xml')
+      
+      deploy_application(
+        hostname: 'mock-dx-server.dxclient-test.svc.cluster.local', 
+        dxUsername: 'dx-test-username', 
+        dxPassword: 'dx-test-password', 
+        dxProtocol: 'http', 
+        dxPort: '9080', 
+        applicationFile: '/tmp/test.ear', 
+        applicationName: 'TestApp')
+      
+      deploy_theme(
+        hostname: 'mock-dx-server.dxclient-test.svc.cluster.local', 
+        dxUsername: 'dx-test-username', 
+        dxPassword: 'dx-test-password', 
+        dxProtocol: 'http', 
+        dxPort: '9080', 
+        themeName: 'TestTheme', 
+        themePath: '/tmp/themes/TestTheme')
   }
