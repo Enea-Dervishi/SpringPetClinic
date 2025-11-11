@@ -22,7 +22,12 @@ agent {
         dxclientPath: '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient',
         disablePrompt: 'true',
         applicationFile: 'test-app.ear', 
-        applicationName: 'TestApp')
+        applicationName: 'TestApp',
+        dxConnectUsername: 'dx-test-username',
+        dxConnectPassword: 'dx-test-password',
+        dxConnectPort: '443',
+        dxSoapPort: '10033',
+        dxProfileName: 'wp_profile')
       
       deploy_theme(
         hostname: 'mock-dx-server.dxclient-test.svc.cluster.local', 
