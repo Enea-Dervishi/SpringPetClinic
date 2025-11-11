@@ -1,6 +1,7 @@
 agent {
       checkoutSCM()
       
+      /*
       xmlaccess(
         hostname: 'mock-dx-server.dxclient-test.svc.cluster.local', 
         dxUsername: 'dx-test-username', 
@@ -10,6 +11,7 @@ agent {
         dxclientPath: '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient',
         disablePrompt: 'true',
         xmlFile: 'test-config.xml')
+      */
       
       deploy_application(
         hostname: 'mock-dx-server.dxclient-test.svc.cluster.local', 
@@ -19,7 +21,7 @@ agent {
         dxPort: '9080', 
         dxclientPath: '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient',
         disablePrompt: 'true',
-        applicationFile: '/tmp/test.ear', 
+        applicationFile: 'test-app.ear', 
         applicationName: 'TestApp')
       
       deploy_theme(
