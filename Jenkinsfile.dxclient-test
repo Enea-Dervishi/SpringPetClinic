@@ -9,7 +9,7 @@ agent {
         dxPort: '9080', 
         dxclientPath: '/usr/local/lib/node_modules/@hcl-software/dxclient/bin/dxclient',
         disablePrompt: 'true',
-        xmlFile: '/tmp/test-config.xml')
+        xmlFile: 'test-config.xml')
       
       deploy_application(
         hostname: 'mock-dx-server.dxclient-test.svc.cluster.local', 
