@@ -1,7 +1,7 @@
 libraries {
     kubernetes
     git{
-        url = 'git@github.com:Enea-Dervishi/SpringPetClinic.git'
+        url = 'https://github.com/Enea-Dervishi/SpringPetClinic.git'
         branch = 'main'
         credentialsId = 'github-pat'
     }
