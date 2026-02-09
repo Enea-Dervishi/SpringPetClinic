@@ -1,0 +1,10 @@
+properties([
+    parameters([
+        choice(name: 'Build_Type', choices: ['Package', 'Publish'])
+    ])
+])
+
+agent{
+  checkoutScm()
+   params.Build_Type == 'Publish' ? publish() : mvnPackage()
+}

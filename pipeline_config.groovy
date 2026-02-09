@@ -1,6 +1,21 @@
 libraries {
     kubernetes
     git
+    maven {
+        containerImage = 'maven:3.6-ibmjava-alpine'
+        mvnPackage{
+            stageName = 'Maven Build'
+            phases = ['clean' , 'package']
+            options = ['-Dmaven.install.skip=true']
+            revision = '$BUILD_TIMESTAMP'
+        }
+        publish {
+            stageName = 'Maven Deploy'
+            phases = ['deploy']
+            options = ['-DskipTests', '-Dmaven.deploy.uniqueVersion=false', '-DuniqueVersion=false', '-Dmaven.install.skip=true']
+            revision = '$BUILD_TIMESTAMP'
+        }
+    }
     kubectl {
         containerImage = 'alpine/k8s:1.30.0'
         createNamespace {
