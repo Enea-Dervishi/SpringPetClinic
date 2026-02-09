@@ -20,7 +20,7 @@ libraries {
             revision = '$BUILD_TIMESTAMP'
         }
     }
-    kubectl {
+    /*kubectl {
         containerImage = 'alpine/k8s:1.30.0'
         createNamespace {
             command = 'create'
@@ -34,7 +34,7 @@ libraries {
             name = ''
             flags = '-k k8s/overlays/dev'
         }
-    }
+    }*/
     terraform {
         project_name = "petclinic"
         version = "1.5"
