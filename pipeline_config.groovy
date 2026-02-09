@@ -1,6 +1,10 @@
 libraries {
     kubernetes
-    git
+    git{
+        url = 'git@github.com:Enea-Dervishi/SpringPetClinic.git'
+        branch = 'main'
+        credentialsId = 'github-pat'
+    }
     maven {
         containerImage = 'maven:3.6-ibmjava-alpine'
         mvnPackage{
